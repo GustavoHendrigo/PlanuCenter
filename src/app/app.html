@@ -1,32 +1,36 @@
-<div class="flex h-screen bg-gray-100 font-sans">
-  <aside
-    class="w-64 bg-gray-800 text-white flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:translate-x-0"
-    [class.translate-x-0]="isMobileMenuOpen()"
-    [class.-translate-x-full]="!isMobileMenuOpen()"
-  >
-    <app-sidebar (navItemClicked)="isMobileMenuOpen.set(false)" />
-  </aside>
+@if (isLoginRoute()) {
+  <router-outlet></router-outlet>
+} @else {
+  <div class="flex h-screen bg-gray-100 font-sans">
+    <aside
+      class="w-64 bg-gray-800 text-white flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:translate-x-0"
+      [class.translate-x-0]="isMobileMenuOpen()"
+      [class.-translate-x-full]="!isMobileMenuOpen()"
+    >
+      <app-sidebar (navItemClicked)="isMobileMenuOpen.set(false)" />
+    </aside>
 
-  @if (isMobileMenuOpen()) {
-    <div class="fixed inset-0 bg-black/60 z-20 md:hidden" (click)="isMobileMenuOpen.set(false)"></div>
-  }
+    @if (isMobileMenuOpen()) {
+      <div class="fixed inset-0 bg-black/60 z-20 md:hidden" (click)="isMobileMenuOpen.set(false)"></div>
+    }
 
-  <div class="flex-1 flex flex-col overflow-hidden md:pl-64">
-    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <button class="md:hidden text-gray-600" (click)="isMobileMenuOpen.set(true)">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-      </button>
-      
-      <div></div>
+    <div class="flex-1 flex flex-col overflow-hidden md:pl-64">
+      <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
+        <button class="md:hidden text-gray-600" (click)="isMobileMenuOpen.set(true)">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
 
-      <div class="flex items-center">
-        <span class="mr-3 text-gray-700 font-medium">Admin</span>
-        <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">A</div>
-      </div>
-    </header>
+        <div></div>
 
-    <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6">
-      <router-outlet></router-outlet>
-    </main>
+        <div class="flex items-center">
+          <span class="mr-3 text-gray-700 font-medium">Admin</span>
+          <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">A</div>
+        </div>
+      </header>
+
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6">
+        <router-outlet></router-outlet>
+      </main>
+    </div>
   </div>
-</div>
+}
