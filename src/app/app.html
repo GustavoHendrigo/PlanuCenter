@@ -1,32 +1,108 @@
-<div class="flex h-screen bg-gray-100 font-sans">
-  <aside
-    class="w-64 bg-gray-800 text-white flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:translate-x-0"
-    [class.translate-x-0]="isMobileMenuOpen()"
-    [class.-translate-x-full]="!isMobileMenuOpen()"
-  >
-    <app-sidebar (navItemClicked)="isMobileMenuOpen.set(false)" />
-  </aside>
+@if (isLoginRoute()) {
+  <router-outlet></router-outlet>
+} @else {
+  <div class="flex h-screen bg-gray-100 font-sans">
+    <aside
+      class="w-64 bg-gray-800 text-white flex-shrink-0 flex flex-col fixed inset-y-0 left-0 z-30 transition-transform duration-300 md:translate-x-0"
+      [class.translate-x-0]="isMobileMenuOpen()"
+      [class.-translate-x-full]="!isMobileMenuOpen()"
+    >
+      <app-sidebar (navItemClicked)="isMobileMenuOpen.set(false)" />
+    </aside>
 
-  @if (isMobileMenuOpen()) {
-    <div class="fixed inset-0 bg-black/60 z-20 md:hidden" (click)="isMobileMenuOpen.set(false)"></div>
-  }
+    @if (isMobileMenuOpen()) {
+      <div class="fixed inset-0 bg-black/60 z-20 md:hidden" (click)="isMobileMenuOpen.set(false)"></div>
+    }
 
-  <div class="flex-1 flex flex-col overflow-hidden md:pl-64">
-    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <button class="md:hidden text-gray-600" (click)="isMobileMenuOpen.set(true)">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-      </button>
-      
-      <div></div>
+    <div class="flex-1 flex flex-col overflow-hidden md:pl-64">
+      <header class="h-16 bg-white/80 backdrop-blur border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <button class="md:hidden text-gray-600" (click)="isMobileMenuOpen.set(true)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
 
-      <div class="flex items-center">
-        <span class="mr-3 text-gray-700 font-medium">Admin</span>
-        <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">A</div>
-      </div>
-    </header>
+          <div class="hidden md:flex items-center gap-2 rounded-2xl bg-gray-100 px-3 py-2 text-sm text-gray-500 ring-1 ring-gray-200 focus-within:ring-blue-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M18 10.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
+            <input class="bg-transparent focus:outline-none" type="search" placeholder="Buscar clientes, ordens, veículos..." />
+          </div>
+        </div>
 
-    <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6">
-      <router-outlet></router-outlet>
-    </main>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <button class="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200" (click)="openQuickPanel('analytics')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 0 0 12 21a9 9 0 0 0 9-9 8.97 8.97 0 0 0-.507-2.984M21 3l-9 9" /></svg>
+          </button>
+          <button class="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition hover:bg-gray-200" (click)="openQuickPanel('notifications')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9m-9 13a3 3 0 0 0 6 0" /></svg>
+            <span class="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[0.65rem] font-semibold text-white">3</span>
+          </button>
+
+          <div class="relative">
+            <button
+              class="flex items-center rounded-full bg-gray-100 pl-2 pr-3 text-left text-sm text-gray-700 transition hover:bg-gray-200"
+              (click)="toggleProfileMenu()"
+            >
+              <div class="mr-2 h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-semibold">
+                A
+              </div>
+              <div class="hidden sm:block leading-tight">
+                <p class="font-semibold">Ana Rodrigues</p>
+                <p class="text-xs text-gray-500">Administrador</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg>
+            </button>
+
+            @if (isProfileMenuOpen()) {
+              <div class="absolute right-0 mt-2 w-56 rounded-2xl border border-gray-100 bg-white p-2 text-sm shadow-xl shadow-gray-900/10">
+                <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Conta</p>
+                <button class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-gray-100" (click)="handleProfileAction('profile')">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.1A7.5 7.5 0 0 1 12 15a7.5 7.5 0 0 1 7.5 5.1" /></svg>
+                  </span>
+                  <span>
+                    <span class="font-medium text-gray-700">Ver perfil</span>
+                    <span class="block text-xs text-gray-500">Atualize seus dados pessoais</span>
+                  </span>
+                </button>
+                <button class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-gray-100" (click)="handleProfileAction('settings')">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50 text-purple-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317a1 1 0 0 1 1.35-.439l.284.14a1 1 0 0 0 .894 0l.284-.14a1 1 0 0 1 1.35.44l.15.3a1 1 0 0 0 .75.517l.334.05a1 1 0 0 1 .857.99v.32a1 1 0 0 0 .57.9l.292.146a1 1 0 0 1 .515 1.316l-.134.31a1 1 0 0 0 0 .764l.134.31a1 1 0 0 1-.515 1.316l-.292.145a1 1 0 0 0-.57.9v.32a1 1 0 0 1-.857.99l-.334.05a1 1 0 0 0-.75.518l-.15.3a1 1 0 0 1-1.35.439l-.284-.14a1 1 0 0 0-.894 0l-.284.14a1 1 0 0 1-1.35-.44l-.15-.3a1 1 0 0 0-.75-.517l-.334-.05a1 1 0 0 1-.857-.99v-.32a1 1 0 0 0-.57-.9l-.292-.145a1 1 0 0 1-.515-1.316l.134-.31a1 1 0 0 0 0-.764l-.134-.31a1 1 0 0 1 .515-1.316l.292-.146a1 1 0 0 0 .57-.9v-.32a1 1 0 0 1 .857-.99l.334-.05a1 1 0 0 0 .75-.518l.15-.3Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                  </span>
+                  <span>
+                    <span class="font-medium text-gray-700">Preferências</span>
+                    <span class="block text-xs text-gray-500">Temas, notificações e integrações</span>
+                  </span>
+                </button>
+                <div class="my-1 border-t border-gray-100"></div>
+                <button class="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-red-600 transition hover:bg-red-50" (click)="handleProfileAction('logout')">
+                  <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 17 5-5-5-5M20 12H9m6 7v-1a4 4 0 0 0-4-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" /></svg>
+                  </span>
+                  <span>
+                    <span class="font-medium">Sair</span>
+                    <span class="block text-xs text-gray-500">Encerrar sessão com segurança</span>
+                  </span>
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      </header>
+
+      @if (quickPanel()) {
+        <div class="border-b border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900 sm:px-6">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="font-semibold">{{ quickPanel()?.title }}</p>
+              <p class="text-xs text-blue-800/90">{{ quickPanel()?.description }}</p>
+            </div>
+            <button class="text-xs font-medium text-blue-700 hover:text-blue-900" (click)="closeQuickPanel()">Fechar</button>
+          </div>
+        </div>
+      }
+
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6">
+        <router-outlet></router-outlet>
+      </main>
+    </div>
   </div>
-</div>
+}
