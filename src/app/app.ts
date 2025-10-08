@@ -5,6 +5,11 @@ import { SidebarComponent } from './layout/sidebar.component';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 
+type QuickPanelState = {
+  title: string;
+  description: string;
+};
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -12,10 +17,6 @@ import { filter, map, startWith } from 'rxjs';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-type QuickPanelState = {
-  title: string;
-  description: string;
-};
 
 export class App {
   private router = inject(Router);
