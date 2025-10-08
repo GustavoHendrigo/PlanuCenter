@@ -8,27 +8,30 @@ import { MenuItem } from '../core/models/models';
   standalone: true,
   imports: [CommonModule, RouterLink, RouterLinkActive],
   template: `
-    <div class="flex h-full flex-col bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800 text-gray-100">
-      <div class="flex h-20 items-center gap-3 px-6">
-        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-400">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="h-7 w-7"
-          >
-            <path
-              d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"
-            />
-          </svg>
+    <div class="flex h-full flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 text-gray-100">
+      <div class="flex h-24 items-center gap-3 px-6">
+        <div class="relative h-12 w-12">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-500/80 via-blue-500/80 to-indigo-500/80 shadow-lg shadow-blue-900/40"></div>
+          <div class="absolute inset-[6px] rounded-xl bg-gray-950"></div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="h-6 w-6 text-cyan-300"
+            >
+              <path d="M5 6.5C5 4.567 6.567 3 8.5 3h7A3.5 3.5 0 0 1 19 6.5V9h-5.25A3.75 3.75 0 0 0 10 12.75V21H8.5A3.5 3.5 0 0 1 5 17.5Z" />
+              <path d="M14 21v-8.25A2.75 2.75 0 0 1 16.75 10H21" />
+            </svg>
+          </div>
         </div>
         <div>
-          <p class="text-lg font-semibold">PlanuCenter</p>
-          <p class="text-xs text-gray-400">Gestão simplificada</p>
+          <p class="text-lg font-semibold tracking-wide text-white">PlanuCenter</p>
+          <p class="text-xs uppercase tracking-[0.2em] text-cyan-200/80">Operações inteligentes</p>
         </div>
       </div>
 
@@ -65,28 +68,6 @@ import { MenuItem } from '../core/models/models';
         </div>
       </div>
 
-      <div class="border-t border-white/10 px-6 py-5">
-        <p class="text-sm font-semibold text-white">Precisa de ajuda?</p>
-        <p class="mt-1 text-xs text-gray-400">Nossa equipe está pronta para auxiliar sua operação.</p>
-        <button
-          type="button"
-          class="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white/10 py-2 text-sm font-medium text-white transition hover:bg-white/20"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="h-4 w-4"
-          >
-            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Zm0-7v-1a3 3 0 0 1 3-3h1m-4-4h.01" />
-          </svg>
-          Central de suporte
-        </button>
-      </div>
     </div>
   `,
 })
