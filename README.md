@@ -49,7 +49,7 @@ npm install
 npm start
 ```
 
-A aplicação estará em `http://localhost:4200` consumindo os dados da API. Ajuste a URL base da API em `src/environments/environment.ts` caso necessário.
+A aplicação estará em `http://localhost:4200` consumindo os dados da API. Ajuste a URL base da API em `src/environments/environment.ts` caso necessário. Caso a API não esteja acessível, o front-end retorna automaticamente aos dados mockados originais, permitindo testar os fluxos de cadastro mesmo sem banco de dados.
 
 ## Testes
 
