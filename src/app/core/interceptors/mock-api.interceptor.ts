@@ -8,7 +8,7 @@ import {
   MOCK_VEICULOS,
 } from '../mocks/mock-data';
 
-function handleMockRequest(pathname: string): HttpResponse | null {
+function handleMockRequest(pathname: string): HttpResponse<unknown> | null {
   switch (pathname) {
     case '/api/clients':
       return new HttpResponse({ status: 200, body: MOCK_CLIENTES });
