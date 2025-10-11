@@ -1,83 +1,161 @@
-import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { inject, Injectable, signal } from '@angular/core';
+import { tap } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { Cliente, OrdemServico, Peca, Servico, Veiculo } from '../models/models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
+  private http = inject(HttpClient);
+  private readonly apiUrl = environment.apiUrl;
 
-  // --- DADOS MOCKADOS (Simulação de um banco de dados) ---
-  // Usando Signals para reatividade.
-  
-  readonly clientes = signal<Cliente[]>([
-    { id: 1, nome: 'Carlos Alberto', email: 'carlos.alberto@email.com', telefone: '(11) 91234-5678' },
-    { id: 2, nome: 'Joana Pereira', email: 'joana.pereira@email.com', telefone: '(11) 98765-4321' },
-    { id: 3, nome: 'Pedro Henrique', email: 'pedro.henrique@email.com', telefone: '(21) 99876-5432' },
-    { id: 4, nome: 'João da Silva', email: 'joao.silva@email.com', telefone: '(31) 93456-7890' },
-  ]);
+  readonly clientes = signal<Cliente[]>([]);
+  readonly veiculos = signal<Veiculo[]>([]);
+  readonly pecas = signal<Peca[]>([]);
+  readonly servicos = signal<Servico[]>([]);
+  readonly ordensServico = signal<OrdemServico[]>([]);
 
-  readonly veiculos = signal<Veiculo[]>([
-    { id: 1, placa: 'ROZ-1295', marca: 'Toyota', modelo: 'Corolla', ano: '2022', clienteId: 1, clienteNome: 'Carlos Alberto' },
-    { id: 2, placa: 'PEA-0M40', marca: 'Honda', modelo: 'Civic', ano: '2021', clienteId: 3, clienteNome: 'Pedro Henrique' },
-    { id: 3, placa: 'LBT-3954', marca: 'Ford', modelo: 'Ranger', ano: '2023', clienteId: 4, clienteNome: 'João da Silva' },
-    { id: 4, placa: 'XYZ-7890', marca: 'Chevrolet', modelo: 'Onix', ano: '2020', clienteId: 2, clienteNome: 'Joana Pereira' },
-  ]);
+  constructor() {
+    this.refreshClientes().subscribe({ error: this.handleError('carregar clientes') });
+    this.refreshVeiculos().subscribe({ error: this.handleError('carregar veículos') });
+    this.refreshPecas().subscribe({ error: this.handleError('carregar peças') });
+    this.refreshServicos().subscribe({ error: this.handleError('carregar serviços') });
+    this.refreshOrdensServico().subscribe({ error: this.handleError('carregar ordens de serviço') });
+  }
 
-  readonly pecas = signal<Peca[]>([
-    { id: 101, nome: 'Filtro de Óleo', codigo: 'FO-001', estoque: 15, preco: 35.00 },
-    { id: 102, nome: 'Pastilha de Freio', codigo: 'PF-002', estoque: 8, preco: 120.50 },
-    { id: 103, nome: 'Vela de Ignição', codigo: 'VI-003', estoque: 32, preco: 25.00 },
-    { id: 104, nome: 'Óleo Motor 5W30', codigo: 'OM-004', estoque: 20, preco: 55.00 },
-  ]);
+  private handleError(contexto: string) {
+    return (erro: unknown) => {
+      console.error(`Falha ao ${contexto}:`, erro);
+    };
+  }
 
-  readonly servicos = signal<Servico[]>([
-    { id: 201, descricao: 'Troca de Óleo e Filtro', preco: 150.00 },
-    { id: 202, descricao: 'Alinhamento e Balanceamento', preco: 180.00 },
-    { id: 203, descricao: 'Revisão Sistema de Freios', preco: 250.00 },
-  ]);
+  refreshClientes() {
+    return this.http
+      .get<Cliente[]>(`${this.apiUrl}/clients`)
+      .pipe(tap(clientes => this.clientes.set(clientes)));
+  }
 
-  readonly ordensServico = signal<OrdemServico[]>([
-    {
-      id: 974,
-      veiculoId: 1,
-      clienteId: 1,
-      dataEntrada: '2025-09-07',
-      status: 'Em Andamento',
-      servicos: [{ id: 201, qtde: 1 }],
-      pecas: [{ id: 101, qtde: 1 }, { id: 104, qtde: 1 }],
-    },
-    {
-      id: 973,
-      veiculoId: 1,
-      clienteId: 1,
-      dataEntrada: '2025-09-06',
-      status: 'Finalizada',
-      servicos: [{ id: 202, qtde: 1 }],
-      pecas: [],
-    },
-    {
-      id: 971,
-      veiculoId: 2,
-      clienteId: 3,
-      dataEntrada: '2025-09-05',
-      status: 'Aguardando Aprovação',
-      servicos: [{ id: 203, qtde: 1 }],
-      pecas: [{ id: 102, qtde: 2 }],
-    },
-    {
-      id: 968,
-      veiculoId: 3,
-      clienteId: 4,
-      dataEntrada: '2025-09-02',
-      status: 'Finalizada',
-      servicos: [{ id: 201, qtde: 1 }],
-      pecas: [{ id: 101, qtde: 1 }, { id: 104, qtde: 1 }],
-    },
-  ]);
+  refreshVeiculos() {
+    return this.http
+      .get<Veiculo[]>(`${this.apiUrl}/vehicles`)
+      .pipe(tap(veiculos => this.veiculos.set(veiculos)));
+  }
 
-  constructor() { }
+  refreshPecas() {
+    return this.http
+      .get<Peca[]>(`${this.apiUrl}/parts`)
+      .pipe(tap(pecas => this.pecas.set(pecas)));
+  }
 
-  getOrdemServicoById(id: number): OrdemServico | undefined {
-    return this.ordensServico().find(os => os.id === id);
+  refreshServicos() {
+    return this.http
+      .get<Servico[]>(`${this.apiUrl}/services`)
+      .pipe(tap(servicos => this.servicos.set(servicos)));
+  }
+
+  refreshOrdensServico() {
+    return this.http
+      .get<OrdemServico[]>(`${this.apiUrl}/orders`)
+      .pipe(tap(ordens => this.ordensServico.set(ordens)));
+  }
+
+  createCliente(cliente: Omit<Cliente, 'id'>) {
+    return this.http
+      .post<Cliente>(`${this.apiUrl}/clients`, cliente)
+      .pipe(tap(novo => this.clientes.update(lista => [novo, ...lista])));
+  }
+
+  updateCliente(id: number, cliente: Omit<Cliente, 'id'>) {
+    return this.http
+      .put<Cliente>(`${this.apiUrl}/clients/${id}`, cliente)
+      .pipe(tap(atualizado => this.clientes.update(lista => lista.map(item => (item.id === id ? atualizado : item)))));
+  }
+
+  deleteCliente(id: number) {
+    return this.http
+      .delete<void>(`${this.apiUrl}/clients/${id}`)
+      .pipe(tap(() => this.clientes.update(lista => lista.filter(item => item.id !== id))));
+  }
+
+  createVeiculo(veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    return this.http
+      .post<Veiculo>(`${this.apiUrl}/vehicles`, veiculo)
+      .pipe(tap(novo => this.veiculos.update(lista => [novo, ...lista])));
+  }
+
+  updateVeiculo(id: number, veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    return this.http
+      .put<Veiculo>(`${this.apiUrl}/vehicles/${id}`, veiculo)
+      .pipe(tap(atualizado => this.veiculos.update(lista => lista.map(item => (item.id === id ? atualizado : item)))));
+  }
+
+  deleteVeiculo(id: number) {
+    return this.http
+      .delete<void>(`${this.apiUrl}/vehicles/${id}`)
+      .pipe(tap(() => this.veiculos.update(lista => lista.filter(item => item.id !== id))));
+  }
+
+  createPeca(peca: Omit<Peca, 'id'>) {
+    return this.http
+      .post<Peca>(`${this.apiUrl}/parts`, peca)
+      .pipe(tap(nova => this.pecas.update(lista => [nova, ...lista])));
+  }
+
+  updatePeca(id: number, peca: Omit<Peca, 'id'>) {
+    return this.http
+      .put<Peca>(`${this.apiUrl}/parts/${id}`, peca)
+      .pipe(tap(atualizada => this.pecas.update(lista => lista.map(item => (item.id === id ? atualizada : item)))));
+  }
+
+  deletePeca(id: number) {
+    return this.http
+      .delete<void>(`${this.apiUrl}/parts/${id}`)
+      .pipe(tap(() => this.pecas.update(lista => lista.filter(item => item.id !== id))));
+  }
+
+  createServico(servico: Omit<Servico, 'id'>) {
+    return this.http
+      .post<Servico>(`${this.apiUrl}/services`, servico)
+      .pipe(tap(novo => this.servicos.update(lista => [novo, ...lista])));
+  }
+
+  updateServico(id: number, servico: Omit<Servico, 'id'>) {
+    return this.http
+      .put<Servico>(`${this.apiUrl}/services/${id}`, servico)
+      .pipe(tap(atualizado => this.servicos.update(lista => lista.map(item => (item.id === id ? atualizado : item)))));
+  }
+
+  deleteServico(id: number) {
+    return this.http
+      .delete<void>(`${this.apiUrl}/services/${id}`)
+      .pipe(tap(() => this.servicos.update(lista => lista.filter(item => item.id !== id))));
+  }
+
+  createOrdemServico(ordem: Omit<OrdemServico, 'id'>) {
+    return this.http
+      .post<OrdemServico>(`${this.apiUrl}/orders`, ordem)
+      .pipe(tap(nova => this.ordensServico.update(lista => [nova, ...lista])));
+  }
+
+  updateStatusOrdemServico(id: number, status: OrdemServico['status']) {
+    return this.http
+      .put<OrdemServico>(`${this.apiUrl}/orders/${id}`, { status })
+      .pipe(tap(atualizada => this.ordensServico.update(lista => lista.map(item => (item.id === id ? atualizada : item)))));
+  }
+
+  deleteOrdemServico(id: number) {
+    return this.http
+      .delete<void>(`${this.apiUrl}/orders/${id}`)
+      .pipe(tap(() => this.ordensServico.update(lista => lista.filter(item => item.id !== id))));
+  }
+
+  getOrdemServicoById(id: number) {
+    return this.ordensServico().find(ordem => ordem.id === id);
+  }
+
+  fetchOrdemServicoById(id: number) {
+    return this.http.get<OrdemServico>(`${this.apiUrl}/orders/${id}`);
   }
 }

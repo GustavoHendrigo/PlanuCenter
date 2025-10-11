@@ -1,59 +1,71 @@
-# Teste3
+# PlanuCenter
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.1.6.
+Aplicação Angular para gestão de ordens de serviço acompanhada de uma API Node.js + MySQL.
 
-## Development server
+## Pré-requisitos
 
-To start a local development server, run:
+* Node.js 18+
+* npm 9+
+* Servidor MySQL 8 (ou compatível)
 
-```bash
-ng serve
-```
+## Configurando o banco de dados MySQL
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+1. Crie um banco e todas as tabelas executando o script `server/sql/schema.sql` no seu servidor MySQL.
+2. Popule dados iniciais (opcional) com `server/sql/seed.sql`.
+3. Crie um arquivo `.env` dentro da pasta `server/` baseado no `.env.example`:
 
-## Code scaffolding
+   ```bash
+   cp server/.env.example server/.env
+   ```
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+   Ajuste as credenciais conforme o ambiente.
 
-```bash
-ng generate component component-name
-```
+## Rodando a API (Express + MySQL)
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+Instale as dependências e inicie o servidor:
 
 ```bash
-ng build
+cd server
+npm install
+npm run dev
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+A API ficará disponível em `http://localhost:3000` (configurável via `.env`). Endpoints principais:
 
-## Running unit tests
+* `GET /api/clients`
+* `GET /api/vehicles`
+* `GET /api/services`
+* `GET /api/parts`
+* `GET /api/orders`
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+Cada recurso também possui operações de criação, atualização e exclusão.
+
+## Rodando o front-end Angular
+
+Em outro terminal, na raiz do projeto:
 
 ```bash
-ng test
+npm install
+npm start
 ```
 
-## Running end-to-end tests
+A aplicação estará em `http://localhost:4200` consumindo os dados da API. Ajuste a URL base da API em `src/environments/environment.ts` caso necessário.
 
-For end-to-end (e2e) testing, run:
+## Testes
+
+O projeto mantém os comandos padrão do Angular CLI:
 
 ```bash
-ng e2e
+npm test
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Estrutura de pastas
 
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+```
+.
+├── server/              # API Express com integrações MySQL
+│   ├── src/
+│   └── sql/
+├── src/                 # Aplicação Angular
+└── README.md
+```

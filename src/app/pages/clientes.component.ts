@@ -243,22 +243,14 @@ export class ClientesComponent {
 
     if (this.editandoId()) {
       const idParaAtualizar = this.editandoId()!;
-      this.dataService.clientes.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? { ...item, ...dadosNormalizados }
-            : item,
-        ),
-      );
+      this.dataService
+        .updateCliente(idParaAtualizar, dadosNormalizados)
+        .subscribe(() => this.voltarParaLista());
     } else {
-      const novoId = this.dataService.clientes().reduce((max, cliente) => Math.max(max, cliente.id), 0) + 1;
-      this.dataService.clientes.update(lista => [
-        { id: novoId, ...dadosNormalizados },
-        ...lista,
-      ]);
+      this.dataService
+        .createCliente(dadosNormalizados)
+        .subscribe(() => this.voltarParaLista());
     }
-
-    this.voltarParaLista();
   }
 
   voltarParaLista() {
