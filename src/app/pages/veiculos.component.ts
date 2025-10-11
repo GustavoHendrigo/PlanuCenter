@@ -205,40 +205,24 @@ export class VeiculosComponent {
       return;
     }
 
+    const payload = {
+      placa: this.formulario.placa,
+      marca: this.formulario.marca,
+      modelo: this.formulario.modelo,
+      ano: this.formulario.ano,
+      clienteId: cliente.id,
+    };
+
     if (this.editandoId()) {
       const idParaAtualizar = this.editandoId()!;
-      this.dataService.veiculos.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                placa: this.formulario.placa,
-                marca: this.formulario.marca,
-                modelo: this.formulario.modelo,
-                ano: this.formulario.ano,
-                clienteId: cliente.id,
-                clienteNome: cliente.nome,
-              }
-            : item,
-        ),
-      );
+      this.dataService
+        .updateVeiculo(idParaAtualizar, payload)
+        .subscribe(() => this.voltarParaLista());
     } else {
-      const novoId = this.dataService.veiculos().reduce((max, v) => Math.max(max, v.id), 0) + 1;
-      this.dataService.veiculos.update(lista => [
-        {
-          id: novoId,
-          placa: this.formulario.placa,
-          marca: this.formulario.marca,
-          modelo: this.formulario.modelo,
-          ano: this.formulario.ano,
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-        },
-        ...lista,
-      ]);
+      this.dataService
+        .createVeiculo(payload)
+        .subscribe(() => this.voltarParaLista());
     }
-
-    this.voltarParaLista();
   }
 
   private obterClienteSelecionado() {

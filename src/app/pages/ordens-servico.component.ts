@@ -289,10 +289,8 @@ export class OrdensServicoComponent {
       return;
     }
 
-    const novaOrdemId = this.ordensServico().reduce((max, os) => Math.max(max, os.id), 0) + 1;
-    this.dataService.ordensServico.update(ordens => [
-      {
-        id: novaOrdemId,
+    this.dataService
+      .createOrdemServico({
         clienteId: this.formularioOrdem.clienteId!,
         veiculoId: this.formularioOrdem.veiculoId!,
         dataEntrada: this.formularioOrdem.dataEntrada,
@@ -300,11 +298,8 @@ export class OrdensServicoComponent {
         servicos: [],
         pecas: [],
         observacoes: this.formularioOrdem.observacoes?.trim() || undefined,
-      },
-      ...ordens,
-    ]);
-
-    this.voltarParaLista();
+      })
+      .subscribe(() => this.voltarParaLista());
   }
 
   getVeiculo(id: number) {
