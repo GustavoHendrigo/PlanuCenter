@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import { catchError, forkJoin, of, tap, throwError } from 'rxjs';
+import { catchError, finalize, forkJoin, of, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Cliente, OrdemServico, Peca, Servico, Veiculo } from '../models/models';
 
@@ -83,6 +83,7 @@ export class DataService {
   private http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
   private usingMockData = false;
+  private bootstrapInFlight = false;
 
   readonly clientes = signal<Cliente[]>([]);
   readonly veiculos = signal<Veiculo[]>([]);
@@ -100,6 +101,17 @@ export class DataService {
   }
 
   private bootstrapFromApi() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return;
+    }
+
+    if (this.bootstrapInFlight) {
+      return;
+    }
+
+    this.bootstrapInFlight = true;
+
     forkJoin({
       clientes: this.http.get<Cliente[]>(`${this.apiUrl}/clients`),
       veiculos: this.http.get<Veiculo[]>(`${this.apiUrl}/vehicles`),
@@ -109,6 +121,7 @@ export class DataService {
     })
       .pipe(
         tap(({ clientes, veiculos, pecas, servicos, ordens }) => {
+          this.usingMockData = false;
           this.clientes.set(clientes);
           this.veiculos.set(veiculos);
           this.pecas.set(pecas);
@@ -116,21 +129,417 @@ export class DataService {
           this.ordensServico.set(ordens);
         }),
         catchError(erro => {
-          this.handleError('carregar dados iniciais')(erro);
+          this.logError('carregar dados iniciais', erro);
+          this.enableMockFallback();
           return of(null);
+        }),
+        finalize(() => {
+          this.bootstrapInFlight = false;
         })
       )
       .subscribe();
   }
 
-  private handleError(contexto: string) {
+  refreshClientes() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.clientes());
+    }
+
+    return this.http
+      .get<Cliente[]>(`${this.apiUrl}/clients`)
+      .pipe(
+        tap(clientes => {
+          this.onApiCallSucceeded();
+          this.clientes.set(clientes);
+        }),
+        catchError(this.handleRequestError('carregar clientes', () => this.clientes()))
+      );
+  }
+
+  refreshVeiculos() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.veiculos());
+    }
+
+    return this.http
+      .get<Veiculo[]>(`${this.apiUrl}/vehicles`)
+      .pipe(
+        tap(veiculos => {
+          this.onApiCallSucceeded();
+          this.veiculos.set(veiculos);
+        }),
+        catchError(this.handleRequestError('carregar veículos', () => this.veiculos()))
+      );
+  }
+
+  refreshPecas() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.pecas());
+    }
+
+    return this.http
+      .get<Peca[]>(`${this.apiUrl}/parts`)
+      .pipe(
+        tap(pecas => {
+          this.onApiCallSucceeded();
+          this.pecas.set(pecas);
+        }),
+        catchError(this.handleRequestError('carregar peças', () => this.pecas()))
+      );
+  }
+
+  refreshServicos() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.servicos());
+    }
+
+    return this.http
+      .get<Servico[]>(`${this.apiUrl}/services`)
+      .pipe(
+        tap(servicos => {
+          this.onApiCallSucceeded();
+          this.servicos.set(servicos);
+        }),
+        catchError(this.handleRequestError('carregar serviços', () => this.servicos()))
+      );
+  }
+
+  refreshOrdensServico() {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.ordensServico());
+    }
+
+    return this.http
+      .get<OrdemServico[]>(`${this.apiUrl}/orders`)
+      .pipe(
+        tap(ordens => {
+          this.onApiCallSucceeded();
+          this.ordensServico.set(ordens);
+        }),
+        catchError(this.handleRequestError('carregar ordens de serviço', () => this.ordensServico()))
+      );
+  }
+
+  createCliente(cliente: Omit<Cliente, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.createClienteLocal(cliente));
+    }
+
+    return this.http
+      .post<Cliente>(`${this.apiUrl}/clients`, cliente)
+      .pipe(
+        tap(novo => {
+          this.onApiCallSucceeded();
+          this.clientes.update(lista => [novo, ...lista.filter(item => item.id !== novo.id)]);
+        }),
+        catchError(this.handleRequestError('criar cliente', () => this.createClienteLocal(cliente)))
+      );
+  }
+
+  updateCliente(id: number, cliente: Omit<Cliente, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.updateClienteLocal(id, cliente));
+    }
+
+    return this.http
+      .put<Cliente>(`${this.apiUrl}/clients/${id}`, cliente)
+      .pipe(
+        tap(atualizado => {
+          this.onApiCallSucceeded();
+          this.clientes.update(lista => lista.map(item => (item.id === id ? atualizado : item)));
+        }),
+        catchError(this.handleRequestError('atualizar cliente', () => this.updateClienteLocal(id, cliente)))
+      );
+  }
+
+  deleteCliente(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      this.deleteClienteLocal(id);
+      return of(void 0);
+    }
+
+    return this.http
+      .delete<void>(`${this.apiUrl}/clients/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+          this.clientes.update(lista => lista.filter(item => item.id !== id));
+        }),
+        catchError(this.handleRequestError('remover cliente', () => {
+          this.deleteClienteLocal(id);
+        }))
+      );
+  }
+
+  createVeiculo(veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.createVeiculoLocal(veiculo));
+    }
+
+    return this.http
+      .post<Veiculo>(`${this.apiUrl}/vehicles`, veiculo)
+      .pipe(
+        tap(novo => {
+          this.onApiCallSucceeded();
+          this.veiculos.update(lista => [novo, ...lista.filter(item => item.id !== novo.id)]);
+        }),
+        catchError(this.handleRequestError('criar veículo', () => this.createVeiculoLocal(veiculo)))
+      );
+  }
+
+  updateVeiculo(id: number, veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.updateVeiculoLocal(id, veiculo));
+    }
+
+    return this.http
+      .put<Veiculo>(`${this.apiUrl}/vehicles/${id}`, veiculo)
+      .pipe(
+        tap(atualizado => {
+          this.onApiCallSucceeded();
+          this.veiculos.update(lista => lista.map(item => (item.id === id ? atualizado : item)));
+        }),
+        catchError(this.handleRequestError('atualizar veículo', () => this.updateVeiculoLocal(id, veiculo)))
+      );
+  }
+
+  deleteVeiculo(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      this.deleteVeiculoLocal(id);
+      return of(void 0);
+    }
+
+    return this.http
+      .delete<void>(`${this.apiUrl}/vehicles/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+          this.deleteVeiculoLocal(id);
+        }),
+        catchError(this.handleRequestError('remover veículo', () => {
+          this.deleteVeiculoLocal(id);
+        }))
+      );
+  }
+
+  createPeca(peca: Omit<Peca, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.createPecaLocal(peca));
+    }
+
+    return this.http
+      .post<Peca>(`${this.apiUrl}/parts`, peca)
+      .pipe(
+        tap(nova => {
+          this.onApiCallSucceeded();
+          this.pecas.update(lista => [nova, ...lista.filter(item => item.id !== nova.id)]);
+        }),
+        catchError(this.handleRequestError('criar peça', () => this.createPecaLocal(peca)))
+      );
+  }
+
+  updatePeca(id: number, peca: Omit<Peca, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.updatePecaLocal(id, peca));
+    }
+
+    return this.http
+      .put<Peca>(`${this.apiUrl}/parts/${id}`, peca)
+      .pipe(
+        tap(atualizada => {
+          this.onApiCallSucceeded();
+          this.pecas.update(lista => lista.map(item => (item.id === id ? atualizada : item)));
+        }),
+        catchError(this.handleRequestError('atualizar peça', () => this.updatePecaLocal(id, peca)))
+      );
+  }
+
+  deletePeca(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      this.deletePecaLocal(id);
+      return of(void 0);
+    }
+
+    return this.http
+      .delete<void>(`${this.apiUrl}/parts/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+          this.deletePecaLocal(id);
+        }),
+        catchError(this.handleRequestError('remover peça', () => {
+          this.deletePecaLocal(id);
+        }))
+      );
+  }
+
+  createServico(servico: Omit<Servico, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.createServicoLocal(servico));
+    }
+
+    return this.http
+      .post<Servico>(`${this.apiUrl}/services`, servico)
+      .pipe(
+        tap(novo => {
+          this.onApiCallSucceeded();
+          this.servicos.update(lista => [novo, ...lista.filter(item => item.id !== novo.id)]);
+        }),
+        catchError(this.handleRequestError('criar serviço', () => this.createServicoLocal(servico)))
+      );
+  }
+
+  updateServico(id: number, servico: Omit<Servico, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.updateServicoLocal(id, servico));
+    }
+
+    return this.http
+      .put<Servico>(`${this.apiUrl}/services/${id}`, servico)
+      .pipe(
+        tap(atualizado => {
+          this.onApiCallSucceeded();
+          this.servicos.update(lista => lista.map(item => (item.id === id ? atualizado : item)));
+        }),
+        catchError(this.handleRequestError('atualizar serviço', () => this.updateServicoLocal(id, servico)))
+      );
+  }
+
+  deleteServico(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      this.deleteServicoLocal(id);
+      return of(void 0);
+    }
+
+    return this.http
+      .delete<void>(`${this.apiUrl}/services/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+          this.deleteServicoLocal(id);
+        }),
+        catchError(this.handleRequestError('remover serviço', () => {
+          this.deleteServicoLocal(id);
+        }))
+      );
+  }
+
+  createOrdemServico(ordem: Omit<OrdemServico, 'id'>) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.createOrdemServicoLocal(ordem));
+    }
+
+    return this.http
+      .post<OrdemServico>(`${this.apiUrl}/orders`, ordem)
+      .pipe(
+        tap(nova => {
+          this.onApiCallSucceeded();
+          this.ordensServico.update(lista => [nova, ...lista.filter(item => item.id !== nova.id)]);
+        }),
+        catchError(this.handleRequestError('criar ordem de serviço', () => this.createOrdemServicoLocal(ordem)))
+      );
+  }
+
+  updateStatusOrdemServico(id: number, status: OrdemServico['status']) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.updateStatusOrdemServicoLocal(id, status));
+    }
+
+    return this.http
+      .put<OrdemServico>(`${this.apiUrl}/orders/${id}`, { status })
+      .pipe(
+        tap(atualizada => {
+          this.onApiCallSucceeded();
+          this.ordensServico.update(lista => lista.map(item => (item.id === id ? atualizada : item)));
+        }),
+        catchError(this.handleRequestError('atualizar ordem de serviço', () => this.updateStatusOrdemServicoLocal(id, status)))
+      );
+  }
+
+  deleteOrdemServico(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      this.deleteOrdemServicoLocal(id);
+      return of(void 0);
+    }
+
+    return this.http
+      .delete<void>(`${this.apiUrl}/orders/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+          this.deleteOrdemServicoLocal(id);
+        }),
+        catchError(this.handleRequestError('remover ordem de serviço', () => {
+          this.deleteOrdemServicoLocal(id);
+        }))
+      );
+  }
+
+  getOrdemServicoById(id: number) {
+    return this.ordensServico().find(ordem => ordem.id === id);
+  }
+
+  fetchOrdemServicoById(id: number) {
+    if (!this.apiUrl) {
+      this.enableMockFallback();
+      return of(this.getOrdemServicoById(id) as OrdemServico);
+    }
+
+    return this.http
+      .get<OrdemServico>(`${this.apiUrl}/orders/${id}`)
+      .pipe(
+        tap(() => {
+          this.onApiCallSucceeded();
+        }),
+        catchError(this.handleRequestError('buscar ordem de serviço', () => this.getOrdemServicoById(id) as OrdemServico))
+      );
+  }
+
+  private handleRequestError<T>(contexto: string, fallback: () => T) {
     return (erro: unknown) => {
-      console.error(`Falha ao ${contexto}:`, erro);
-      if (!this.usingMockData && this.isConnectionRefused(erro)) {
-        console.warn('Não foi possível acessar a API. Voltando para os dados locais.');
+      this.logError(contexto, erro);
+
+      if (this.isConnectionRefused(erro)) {
         this.enableMockFallback();
+        return of(fallback());
       }
+
+      return throwError(() => erro);
     };
+  }
+
+  private onApiCallSucceeded() {
+    if (!this.usingMockData || this.bootstrapInFlight) {
+      this.usingMockData = false;
+      return;
+    }
+
+    this.usingMockData = false;
+    this.bootstrapFromApi();
+  }
+
+  private logError(contexto: string, erro: unknown) {
+    console.error(`Falha ao ${contexto}:`, erro);
   }
 
   private isConnectionRefused(erro: unknown) {
@@ -138,11 +547,15 @@ export class DataService {
   }
 
   private enableMockFallback() {
+    if (this.usingMockData) {
+      return;
+    }
+
     this.usingMockData = true;
+    console.warn('Não foi possível acessar a API. Voltando para os dados locais.');
+
     this.clientes.set(DEFAULT_CLIENTES.map(cliente => ({ ...cliente })));
-    this.veiculos.set(
-      DEFAULT_VEICULOS.map(veiculo => ({ ...veiculo }))
-    );
+    this.veiculos.set(DEFAULT_VEICULOS.map(veiculo => ({ ...veiculo })));
     this.pecas.set(DEFAULT_PECAS.map(peca => ({ ...peca })));
     this.servicos.set(DEFAULT_SERVICOS.map(servico => ({ ...servico })));
     this.ordensServico.set(
@@ -156,399 +569,6 @@ export class DataService {
 
   private nextId(lista: { id: number }[]) {
     return lista.length ? Math.max(...lista.map(item => item.id)) + 1 : 1;
-  }
-
-  refreshClientes() {
-    if (this.usingMockData) {
-      return of(this.clientes());
-    }
-
-    return this.http
-      .get<Cliente[]>(`${this.apiUrl}/clients`)
-      .pipe(
-        tap(clientes => this.clientes.set(clientes)),
-        catchError(erro => {
-          this.handleError('carregar clientes')(erro);
-          return of(this.clientes());
-        })
-      );
-  }
-
-  refreshVeiculos() {
-    if (this.usingMockData) {
-      return of(this.veiculos());
-    }
-
-    return this.http
-      .get<Veiculo[]>(`${this.apiUrl}/vehicles`)
-      .pipe(
-        tap(veiculos => this.veiculos.set(veiculos)),
-        catchError(erro => {
-          this.handleError('carregar veículos')(erro);
-          return of(this.veiculos());
-        })
-      );
-  }
-
-  refreshPecas() {
-    if (this.usingMockData) {
-      return of(this.pecas());
-    }
-
-    return this.http
-      .get<Peca[]>(`${this.apiUrl}/parts`)
-      .pipe(
-        tap(pecas => this.pecas.set(pecas)),
-        catchError(erro => {
-          this.handleError('carregar peças')(erro);
-          return of(this.pecas());
-        })
-      );
-  }
-
-  refreshServicos() {
-    if (this.usingMockData) {
-      return of(this.servicos());
-    }
-
-    return this.http
-      .get<Servico[]>(`${this.apiUrl}/services`)
-      .pipe(
-        tap(servicos => this.servicos.set(servicos)),
-        catchError(erro => {
-          this.handleError('carregar serviços')(erro);
-          return of(this.servicos());
-        })
-      );
-  }
-
-  refreshOrdensServico() {
-    if (this.usingMockData) {
-      return of(this.ordensServico());
-    }
-
-    return this.http
-      .get<OrdemServico[]>(`${this.apiUrl}/orders`)
-      .pipe(
-        tap(ordens => this.ordensServico.set(ordens)),
-        catchError(erro => {
-          this.handleError('carregar ordens de serviço')(erro);
-          return of(this.ordensServico());
-        })
-      );
-  }
-
-  createCliente(cliente: Omit<Cliente, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.createClienteLocal(cliente));
-    }
-
-    return this.http
-      .post<Cliente>(`${this.apiUrl}/clients`, cliente)
-      .pipe(
-        tap(novo => this.clientes.update(lista => [novo, ...lista])),
-        catchError(erro => {
-          this.handleError('criar cliente')(erro);
-          if (this.usingMockData) {
-            return of(this.createClienteLocal(cliente));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  updateCliente(id: number, cliente: Omit<Cliente, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.updateClienteLocal(id, cliente));
-    }
-
-    return this.http
-      .put<Cliente>(`${this.apiUrl}/clients/${id}`, cliente)
-      .pipe(
-        tap(atualizado => this.clientes.update(lista => lista.map(item => (item.id === id ? atualizado : item)))),
-        catchError(erro => {
-          this.handleError('atualizar cliente')(erro);
-          if (this.usingMockData) {
-            return of(this.updateClienteLocal(id, cliente));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  deleteCliente(id: number) {
-    if (this.usingMockData) {
-      this.deleteClienteLocal(id);
-      return of(void 0);
-    }
-
-    return this.http
-      .delete<void>(`${this.apiUrl}/clients/${id}`)
-      .pipe(
-        tap(() => this.clientes.update(lista => lista.filter(item => item.id !== id))),
-        catchError(erro => {
-          this.handleError('remover cliente')(erro);
-          if (this.usingMockData) {
-            this.deleteClienteLocal(id);
-            return of(void 0);
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  createVeiculo(veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
-    if (this.usingMockData) {
-      return of(this.createVeiculoLocal(veiculo));
-    }
-
-    return this.http
-      .post<Veiculo>(`${this.apiUrl}/vehicles`, veiculo)
-      .pipe(
-        tap(novo => this.veiculos.update(lista => [novo, ...lista])),
-        catchError(erro => {
-          this.handleError('criar veículo')(erro);
-          if (this.usingMockData) {
-            return of(this.createVeiculoLocal(veiculo));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  updateVeiculo(id: number, veiculo: Omit<Veiculo, 'id' | 'clienteNome'>) {
-    if (this.usingMockData) {
-      return of(this.updateVeiculoLocal(id, veiculo));
-    }
-
-    return this.http
-      .put<Veiculo>(`${this.apiUrl}/vehicles/${id}`, veiculo)
-      .pipe(
-        tap(atualizado => this.veiculos.update(lista => lista.map(item => (item.id === id ? atualizado : item)))),
-        catchError(erro => {
-          this.handleError('atualizar veículo')(erro);
-          if (this.usingMockData) {
-            return of(this.updateVeiculoLocal(id, veiculo));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  deleteVeiculo(id: number) {
-    if (this.usingMockData) {
-      this.deleteVeiculoLocal(id);
-      return of(void 0);
-    }
-
-    return this.http
-      .delete<void>(`${this.apiUrl}/vehicles/${id}`)
-      .pipe(
-        tap(() => this.veiculos.update(lista => lista.filter(item => item.id !== id))),
-        catchError(erro => {
-          this.handleError('remover veículo')(erro);
-          if (this.usingMockData) {
-            this.deleteVeiculoLocal(id);
-            return of(void 0);
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  createPeca(peca: Omit<Peca, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.createPecaLocal(peca));
-    }
-
-    return this.http
-      .post<Peca>(`${this.apiUrl}/parts`, peca)
-      .pipe(
-        tap(nova => this.pecas.update(lista => [nova, ...lista])),
-        catchError(erro => {
-          this.handleError('criar peça')(erro);
-          if (this.usingMockData) {
-            return of(this.createPecaLocal(peca));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  updatePeca(id: number, peca: Omit<Peca, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.updatePecaLocal(id, peca));
-    }
-
-    return this.http
-      .put<Peca>(`${this.apiUrl}/parts/${id}`, peca)
-      .pipe(
-        tap(atualizada => this.pecas.update(lista => lista.map(item => (item.id === id ? atualizada : item)))),
-        catchError(erro => {
-          this.handleError('atualizar peça')(erro);
-          if (this.usingMockData) {
-            return of(this.updatePecaLocal(id, peca));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  deletePeca(id: number) {
-    if (this.usingMockData) {
-      this.deletePecaLocal(id);
-      return of(void 0);
-    }
-
-    return this.http
-      .delete<void>(`${this.apiUrl}/parts/${id}`)
-      .pipe(
-        tap(() => this.pecas.update(lista => lista.filter(item => item.id !== id))),
-        catchError(erro => {
-          this.handleError('remover peça')(erro);
-          if (this.usingMockData) {
-            this.deletePecaLocal(id);
-            return of(void 0);
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  createServico(servico: Omit<Servico, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.createServicoLocal(servico));
-    }
-
-    return this.http
-      .post<Servico>(`${this.apiUrl}/services`, servico)
-      .pipe(
-        tap(novo => this.servicos.update(lista => [novo, ...lista])),
-        catchError(erro => {
-          this.handleError('criar serviço')(erro);
-          if (this.usingMockData) {
-            return of(this.createServicoLocal(servico));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  updateServico(id: number, servico: Omit<Servico, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.updateServicoLocal(id, servico));
-    }
-
-    return this.http
-      .put<Servico>(`${this.apiUrl}/services/${id}`, servico)
-      .pipe(
-        tap(atualizado => this.servicos.update(lista => lista.map(item => (item.id === id ? atualizado : item)))),
-        catchError(erro => {
-          this.handleError('atualizar serviço')(erro);
-          if (this.usingMockData) {
-            return of(this.updateServicoLocal(id, servico));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  deleteServico(id: number) {
-    if (this.usingMockData) {
-      this.deleteServicoLocal(id);
-      return of(void 0);
-    }
-
-    return this.http
-      .delete<void>(`${this.apiUrl}/services/${id}`)
-      .pipe(
-        tap(() => this.servicos.update(lista => lista.filter(item => item.id !== id))),
-        catchError(erro => {
-          this.handleError('remover serviço')(erro);
-          if (this.usingMockData) {
-            this.deleteServicoLocal(id);
-            return of(void 0);
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  createOrdemServico(ordem: Omit<OrdemServico, 'id'>) {
-    if (this.usingMockData) {
-      return of(this.createOrdemServicoLocal(ordem));
-    }
-
-    return this.http
-      .post<OrdemServico>(`${this.apiUrl}/orders`, ordem)
-      .pipe(
-        tap(nova => this.ordensServico.update(lista => [nova, ...lista])),
-        catchError(erro => {
-          this.handleError('criar ordem de serviço')(erro);
-          if (this.usingMockData) {
-            return of(this.createOrdemServicoLocal(ordem));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  updateStatusOrdemServico(id: number, status: OrdemServico['status']) {
-    if (this.usingMockData) {
-      return of(this.updateStatusOrdemServicoLocal(id, status));
-    }
-
-    return this.http
-      .put<OrdemServico>(`${this.apiUrl}/orders/${id}`, { status })
-      .pipe(
-        tap(atualizada => this.ordensServico.update(lista => lista.map(item => (item.id === id ? atualizada : item)))),
-        catchError(erro => {
-          this.handleError('atualizar ordem de serviço')(erro);
-          if (this.usingMockData) {
-            return of(this.updateStatusOrdemServicoLocal(id, status));
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  deleteOrdemServico(id: number) {
-    if (this.usingMockData) {
-      this.deleteOrdemServicoLocal(id);
-      return of(void 0);
-    }
-
-    return this.http
-      .delete<void>(`${this.apiUrl}/orders/${id}`)
-      .pipe(
-        tap(() => this.ordensServico.update(lista => lista.filter(item => item.id !== id))),
-        catchError(erro => {
-          this.handleError('remover ordem de serviço')(erro);
-          if (this.usingMockData) {
-            this.deleteOrdemServicoLocal(id);
-            return of(void 0);
-          }
-          return throwError(() => erro);
-        })
-      );
-  }
-
-  getOrdemServicoById(id: number) {
-    return this.ordensServico().find(ordem => ordem.id === id);
-  }
-
-  fetchOrdemServicoById(id: number) {
-    if (this.usingMockData) {
-      const ordem = this.getOrdemServicoById(id);
-      return of(ordem as OrdemServico);
-    }
-
-    return this.http.get<OrdemServico>(`${this.apiUrl}/orders/${id}`).pipe(
-      catchError(erro => {
-        this.handleError('buscar ordem de serviço')(erro);
-        return of(this.getOrdemServicoById(id) as OrdemServico);
-      })
-    );
   }
 
   private createClienteLocal(cliente: Omit<Cliente, 'id'>) {
@@ -642,10 +662,11 @@ export class DataService {
           atualizada = { ...item, status };
           return atualizada;
         }
+
         return item;
       })
     );
-    return atualizada as OrdemServico;
+    return atualizada!;
   }
 
   private deleteOrdemServicoLocal(id: number) {
