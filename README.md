@@ -4,13 +4,23 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
-To start a local development server, run:
+This project now possui um backend Node.js simples responsável por persistir os dados em `server/database.json`. Para desenvolver:
 
-```bash
-ng serve
-```
+1. Em um terminal, inicie a API local:
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+   ```bash
+   npm run server
+   ```
+
+   O serviço estará disponível em `http://localhost:3000/api`.
+
+2. Em outro terminal, suba a aplicação Angular:
+
+   ```bash
+   ng serve
+   ```
+
+   Acesse `http://localhost:4200/` no navegador. As alterações nos arquivos front-end recarregam automaticamente a página.
 
 ## Code scaffolding
 

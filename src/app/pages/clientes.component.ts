@@ -230,35 +230,27 @@ export class ClientesComponent {
     this.modoVisualizacao.set('detalhes');
   }
 
-  salvarCliente() {
+  async salvarCliente() {
     if (!this.formulario.nome || !this.formulario.email || !this.formulario.telefone) {
       return;
     }
 
     const dadosNormalizados = {
       nome: this.formulario.nome.trim(),
-      email: this.formulario.email.trim(),
-      telefone: this.formulario.telefone.trim(),
+      email: this.formulario.email.trim() || undefined,
+      telefone: this.formulario.telefone.trim() || undefined,
     };
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.clientes.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? { ...item, ...dadosNormalizados }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.clientes().reduce((max, cliente) => Math.max(max, cliente.id), 0) + 1;
-      this.dataService.clientes.update(lista => [
-        { id: novoId, ...dadosNormalizados },
-        ...lista,
-      ]);
+    try {
+      if (this.editandoId()) {
+        await this.dataService.atualizarCliente(this.editandoId()!, dadosNormalizados);
+      } else {
+        await this.dataService.criarCliente(dadosNormalizados);
+      }
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao salvar cliente', error);
     }
-
-    this.voltarParaLista();
   }
 
   voltarParaLista() {
