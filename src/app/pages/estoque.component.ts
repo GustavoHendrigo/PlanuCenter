@@ -178,41 +178,28 @@ export class EstoqueComponent {
     this.modoVisualizacao.set('formulario');
   }
 
-  salvarPeca() {
+  async salvarPeca() {
     if (!this.formulario.codigo || !this.formulario.nome) {
       return;
     }
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.pecas.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                codigo: this.formulario.codigo,
-                nome: this.formulario.nome,
-                estoque: Number(this.formulario.estoque),
-                preco: Number(this.formulario.preco),
-              }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.pecas().reduce((max, peca) => Math.max(max, peca.id), 0) + 1;
-      this.dataService.pecas.update(lista => [
-        {
-          id: novoId,
-          codigo: this.formulario.codigo,
-          nome: this.formulario.nome,
-          estoque: Number(this.formulario.estoque),
-          preco: Number(this.formulario.preco),
-        },
-        ...lista,
-      ]);
-    }
+    const dadosPeca = {
+      codigo: this.formulario.codigo,
+      nome: this.formulario.nome,
+      estoque: Number(this.formulario.estoque),
+      preco: Number(this.formulario.preco),
+    };
 
-    this.voltarParaLista();
+    try {
+      if (this.editandoId()) {
+        await this.dataService.updatePeca(this.editandoId()!, dadosPeca);
+      } else {
+        await this.dataService.createPeca(dadosPeca);
+      }
+      this.voltarParaLista();
+    } catch (erro) {
+      console.error('Não foi possível salvar a peça.', erro);
+    }
   }
 
   voltarParaLista() {

@@ -195,7 +195,7 @@ export class VeiculosComponent {
     this.modoVisualizacao.set('formulario');
   }
 
-  salvarVeiculo() {
+  async salvarVeiculo() {
     if (!this.formulario.placa || !this.formulario.marca || !this.formulario.modelo || !this.formulario.ano || !this.formulario.clienteId) {
       return;
     }
@@ -205,40 +205,24 @@ export class VeiculosComponent {
       return;
     }
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.veiculos.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                placa: this.formulario.placa,
-                marca: this.formulario.marca,
-                modelo: this.formulario.modelo,
-                ano: this.formulario.ano,
-                clienteId: cliente.id,
-                clienteNome: cliente.nome,
-              }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.veiculos().reduce((max, v) => Math.max(max, v.id), 0) + 1;
-      this.dataService.veiculos.update(lista => [
-        {
-          id: novoId,
-          placa: this.formulario.placa,
-          marca: this.formulario.marca,
-          modelo: this.formulario.modelo,
-          ano: this.formulario.ano,
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-        },
-        ...lista,
-      ]);
-    }
+    const dadosVeiculo = {
+      placa: this.formulario.placa,
+      marca: this.formulario.marca,
+      modelo: this.formulario.modelo,
+      ano: this.formulario.ano,
+      clienteId: cliente.id,
+    };
 
-    this.voltarParaLista();
+    try {
+      if (this.editandoId()) {
+        await this.dataService.updateVeiculo(this.editandoId()!, dadosVeiculo);
+      } else {
+        await this.dataService.createVeiculo(dadosVeiculo);
+      }
+      this.voltarParaLista();
+    } catch (erro) {
+      console.error('Não foi possível salvar o veículo.', erro);
+    }
   }
 
   private obterClienteSelecionado() {
