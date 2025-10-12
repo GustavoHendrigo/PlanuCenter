@@ -284,27 +284,27 @@ export class OrdensServicoComponent {
     this.ordemSelecionadaId.set(null);
   }
 
-  salvarOrdem() {
+  async salvarOrdem() {
     if (!this.formularioOrdem.clienteId || !this.formularioOrdem.veiculoId || !this.formularioOrdem.dataEntrada || !this.formularioOrdem.status) {
       return;
     }
 
-    const novaOrdemId = this.ordensServico().reduce((max, os) => Math.max(max, os.id), 0) + 1;
-    this.dataService.ordensServico.update(ordens => [
-      {
-        id: novaOrdemId,
-        clienteId: this.formularioOrdem.clienteId!,
-        veiculoId: this.formularioOrdem.veiculoId!,
-        dataEntrada: this.formularioOrdem.dataEntrada,
-        status: this.formularioOrdem.status!,
-        servicos: [],
-        pecas: [],
-        observacoes: this.formularioOrdem.observacoes?.trim() || undefined,
-      },
-      ...ordens,
-    ]);
+    const dadosOrdem = {
+      clienteId: this.formularioOrdem.clienteId!,
+      veiculoId: this.formularioOrdem.veiculoId!,
+      dataEntrada: this.formularioOrdem.dataEntrada,
+      status: this.formularioOrdem.status!,
+      servicos: [],
+      pecas: [],
+      observacoes: this.formularioOrdem.observacoes?.trim() || undefined,
+    };
 
-    this.voltarParaLista();
+    try {
+      await this.dataService.createOrdemServico(dadosOrdem);
+      this.voltarParaLista();
+    } catch (erro) {
+      console.error('Não foi possível salvar a ordem de serviço.', erro);
+    }
   }
 
   getVeiculo(id: number) {

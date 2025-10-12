@@ -230,7 +230,7 @@ export class ClientesComponent {
     this.modoVisualizacao.set('detalhes');
   }
 
-  salvarCliente() {
+  async salvarCliente() {
     if (!this.formulario.nome || !this.formulario.email || !this.formulario.telefone) {
       return;
     }
@@ -241,24 +241,17 @@ export class ClientesComponent {
       telefone: this.formulario.telefone.trim(),
     };
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.clientes.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? { ...item, ...dadosNormalizados }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.clientes().reduce((max, cliente) => Math.max(max, cliente.id), 0) + 1;
-      this.dataService.clientes.update(lista => [
-        { id: novoId, ...dadosNormalizados },
-        ...lista,
-      ]);
+    try {
+      if (this.editandoId()) {
+        const idParaAtualizar = this.editandoId()!;
+        await this.dataService.updateCliente(idParaAtualizar, dadosNormalizados);
+      } else {
+        await this.dataService.createCliente(dadosNormalizados);
+      }
+      this.voltarParaLista();
+    } catch (erro) {
+      console.error('Não foi possível salvar o cliente.', erro);
     }
-
-    this.voltarParaLista();
   }
 
   voltarParaLista() {

@@ -2,6 +2,12 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.1.6.
 
+## Banco de dados e persistência
+
+O PlanuCenter utiliza o [IndexedDB](https://developer.mozilla.org/pt-BR/docs/Web/API/IndexedDB_API) do próprio navegador como banco de dados local. Os dados de clientes, veículos, peças, serviços e ordens de serviço são carregados automaticamente na primeira execução e ficam persistidos entre os acessos ao sistema.
+
+Para reiniciar o banco, basta limpar os dados do site diretamente nas configurações do navegador (limpando o armazenamento do aplicativo) ou abrir o aplicativo em uma aba anônima.
+
 ## Development server
 
 To start a local development server, run:
