@@ -195,7 +195,7 @@ export class VeiculosComponent {
     this.modoVisualizacao.set('formulario');
   }
 
-  salvarVeiculo() {
+  async salvarVeiculo() {
     if (!this.formulario.placa || !this.formulario.marca || !this.formulario.modelo || !this.formulario.ano || !this.formulario.clienteId) {
       return;
     }
@@ -205,40 +205,24 @@ export class VeiculosComponent {
       return;
     }
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.veiculos.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                placa: this.formulario.placa,
-                marca: this.formulario.marca,
-                modelo: this.formulario.modelo,
-                ano: this.formulario.ano,
-                clienteId: cliente.id,
-                clienteNome: cliente.nome,
-              }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.veiculos().reduce((max, v) => Math.max(max, v.id), 0) + 1;
-      this.dataService.veiculos.update(lista => [
-        {
-          id: novoId,
-          placa: this.formulario.placa,
-          marca: this.formulario.marca,
-          modelo: this.formulario.modelo,
-          ano: this.formulario.ano,
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-        },
-        ...lista,
-      ]);
-    }
+    const dados = {
+      placa: this.formulario.placa.trim(),
+      marca: this.formulario.marca.trim(),
+      modelo: this.formulario.modelo.trim(),
+      ano: this.formulario.ano.trim(),
+      clienteId: cliente.id,
+    };
 
-    this.voltarParaLista();
+    try {
+      if (this.editandoId()) {
+        await this.dataService.atualizarVeiculo(this.editandoId()!, dados);
+      } else {
+        await this.dataService.criarVeiculo(dados);
+      }
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao salvar veículo', error);
+    }
   }
 
   private obterClienteSelecionado() {
