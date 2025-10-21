@@ -1,81 +1,128 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Cliente, OrdemServico, Peca, Servico, Veiculo } from '../models/models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
+  private http = inject(HttpClient);
+  private readonly apiUrl = 'http://localhost:3000/api';
 
-  // --- DADOS MOCKADOS (Simulação de um banco de dados) ---
-  // Usando Signals para reatividade.
-  
-  readonly clientes = signal<Cliente[]>([
-    { id: 1, nome: 'Carlos Alberto', email: 'carlos.alberto@email.com', telefone: '(11) 91234-5678' },
-    { id: 2, nome: 'Joana Pereira', email: 'joana.pereira@email.com', telefone: '(11) 98765-4321' },
-    { id: 3, nome: 'Pedro Henrique', email: 'pedro.henrique@email.com', telefone: '(21) 99876-5432' },
-    { id: 4, nome: 'João da Silva', email: 'joao.silva@email.com', telefone: '(31) 93456-7890' },
-  ]);
+  readonly clientes = signal<Cliente[]>([]);
+  readonly veiculos = signal<Veiculo[]>([]);
+  readonly pecas = signal<Peca[]>([]);
+  readonly servicos = signal<Servico[]>([]);
+  readonly ordensServico = signal<OrdemServico[]>([]);
 
-  readonly veiculos = signal<Veiculo[]>([
-    { id: 1, placa: 'ROZ-1295', marca: 'Toyota', modelo: 'Corolla', ano: '2022', clienteId: 1, clienteNome: 'Carlos Alberto' },
-    { id: 2, placa: 'PEA-0M40', marca: 'Honda', modelo: 'Civic', ano: '2021', clienteId: 3, clienteNome: 'Pedro Henrique' },
-    { id: 3, placa: 'LBT-3954', marca: 'Ford', modelo: 'Ranger', ano: '2023', clienteId: 4, clienteNome: 'João da Silva' },
-    { id: 4, placa: 'XYZ-7890', marca: 'Chevrolet', modelo: 'Onix', ano: '2020', clienteId: 2, clienteNome: 'Joana Pereira' },
-  ]);
+  constructor() {
+    void this.carregarDadosIniciais();
+  }
 
-  readonly pecas = signal<Peca[]>([
-    { id: 101, nome: 'Filtro de Óleo', codigo: 'FO-001', estoque: 15, preco: 35.00 },
-    { id: 102, nome: 'Pastilha de Freio', codigo: 'PF-002', estoque: 8, preco: 120.50 },
-    { id: 103, nome: 'Vela de Ignição', codigo: 'VI-003', estoque: 32, preco: 25.00 },
-    { id: 104, nome: 'Óleo Motor 5W30', codigo: 'OM-004', estoque: 20, preco: 55.00 },
-  ]);
+  async carregarDadosIniciais() {
+    await Promise.all([
+      this.carregarClientes(),
+      this.carregarVeiculos(),
+      this.carregarPecas(),
+      this.carregarServicos(),
+      this.carregarOrdensServico(),
+    ]);
+  }
 
-  readonly servicos = signal<Servico[]>([
-    { id: 201, descricao: 'Troca de Óleo e Filtro', preco: 150.00 },
-    { id: 202, descricao: 'Alinhamento e Balanceamento', preco: 180.00 },
-    { id: 203, descricao: 'Revisão Sistema de Freios', preco: 250.00 },
-  ]);
+  async carregarClientes() {
+    try {
+      const clientes = await firstValueFrom(this.http.get<Cliente[]>(`${this.apiUrl}/clientes`));
+      this.clientes.set(clientes);
+    } catch (error) {
+      console.error('Erro ao carregar clientes', error);
+    }
+  }
 
-  readonly ordensServico = signal<OrdemServico[]>([
-    {
-      id: 974,
-      veiculoId: 1,
-      clienteId: 1,
-      dataEntrada: '2025-09-07',
-      status: 'Em Andamento',
-      servicos: [{ id: 201, qtde: 1 }],
-      pecas: [{ id: 101, qtde: 1 }, { id: 104, qtde: 1 }],
-    },
-    {
-      id: 973,
-      veiculoId: 1,
-      clienteId: 1,
-      dataEntrada: '2025-09-06',
-      status: 'Finalizada',
-      servicos: [{ id: 202, qtde: 1 }],
-      pecas: [],
-    },
-    {
-      id: 971,
-      veiculoId: 2,
-      clienteId: 3,
-      dataEntrada: '2025-09-05',
-      status: 'Aguardando Aprovação',
-      servicos: [{ id: 203, qtde: 1 }],
-      pecas: [{ id: 102, qtde: 2 }],
-    },
-    {
-      id: 968,
-      veiculoId: 3,
-      clienteId: 4,
-      dataEntrada: '2025-09-02',
-      status: 'Finalizada',
-      servicos: [{ id: 201, qtde: 1 }],
-      pecas: [{ id: 101, qtde: 1 }, { id: 104, qtde: 1 }],
-    },
-  ]);
+  async criarCliente(dados: Omit<Cliente, 'id'>) {
+    const novo = await firstValueFrom(this.http.post<Cliente>(`${this.apiUrl}/clientes`, dados));
+    this.clientes.update(lista => [novo, ...lista.filter(cliente => cliente.id !== novo.id)]);
+    return novo;
+  }
 
-  constructor() { }
+  async atualizarCliente(id: number, dados: Omit<Cliente, 'id'>) {
+    const atualizado = await firstValueFrom(this.http.put<Cliente>(`${this.apiUrl}/clientes/${id}`, dados));
+    this.clientes.update(lista => lista.map(cliente => (cliente.id === id ? atualizado : cliente)));
+    await this.carregarVeiculos();
+    return atualizado;
+  }
+
+  async carregarVeiculos() {
+    try {
+      const veiculos = await firstValueFrom(this.http.get<Veiculo[]>(`${this.apiUrl}/veiculos`));
+      this.veiculos.set(veiculos);
+    } catch (error) {
+      console.error('Erro ao carregar veículos', error);
+    }
+  }
+
+  async criarVeiculo(dados: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    const novo = await firstValueFrom(this.http.post<Veiculo>(`${this.apiUrl}/veiculos`, dados));
+    this.veiculos.update(lista => [novo, ...lista.filter(veiculo => veiculo.id !== novo.id)]);
+    return novo;
+  }
+
+  async atualizarVeiculo(id: number, dados: Omit<Veiculo, 'id' | 'clienteNome'>) {
+    const atualizado = await firstValueFrom(this.http.put<Veiculo>(`${this.apiUrl}/veiculos/${id}`, dados));
+    this.veiculos.update(lista => lista.map(veiculo => (veiculo.id === id ? atualizado : veiculo)));
+    return atualizado;
+  }
+
+  async carregarPecas() {
+    try {
+      const pecas = await firstValueFrom(this.http.get<Peca[]>(`${this.apiUrl}/pecas`));
+      this.pecas.set(pecas);
+    } catch (error) {
+      console.error('Erro ao carregar peças', error);
+    }
+  }
+
+  async criarPeca(dados: Omit<Peca, 'id'>) {
+    const nova = await firstValueFrom(this.http.post<Peca>(`${this.apiUrl}/pecas`, dados));
+    this.pecas.update(lista => [nova, ...lista.filter(peca => peca.id !== nova.id)]);
+    return nova;
+  }
+
+  async atualizarPeca(id: number, dados: Omit<Peca, 'id'>) {
+    const atualizada = await firstValueFrom(this.http.put<Peca>(`${this.apiUrl}/pecas/${id}`, dados));
+    this.pecas.update(lista => lista.map(peca => (peca.id === id ? atualizada : peca)));
+    return atualizada;
+  }
+
+  async carregarServicos() {
+    try {
+      const servicos = await firstValueFrom(this.http.get<Servico[]>(`${this.apiUrl}/servicos`));
+      this.servicos.set(servicos);
+    } catch (error) {
+      console.error('Erro ao carregar serviços', error);
+    }
+  }
+
+  async carregarOrdensServico() {
+    try {
+      const ordens = await firstValueFrom(this.http.get<OrdemServico[]>(`${this.apiUrl}/ordens-servico`));
+      this.ordensServico.set(ordens);
+    } catch (error) {
+      console.error('Erro ao carregar ordens de serviço', error);
+    }
+  }
+
+  async criarOrdemServico(dados: Omit<OrdemServico, 'id'>) {
+    const nova = await firstValueFrom(this.http.post<OrdemServico>(`${this.apiUrl}/ordens-servico`, dados));
+    this.ordensServico.update(lista => [nova, ...lista.filter(ordem => ordem.id !== nova.id)]);
+    return nova;
+  }
+
+  async atualizarOrdemServico(id: number, dados: Omit<OrdemServico, 'id'>) {
+    const atualizada = await firstValueFrom(this.http.put<OrdemServico>(`${this.apiUrl}/ordens-servico/${id}`, dados));
+    this.ordensServico.update(lista => lista.map(ordem => (ordem.id === id ? atualizada : ordem)));
+    return atualizada;
+  }
 
   getOrdemServicoById(id: number): OrdemServico | undefined {
     return this.ordensServico().find(os => os.id === id);
