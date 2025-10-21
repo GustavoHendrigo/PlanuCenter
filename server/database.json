@@ -27,6 +27,14 @@
   ],
   "veiculos": [
     {
+      "id": 5,
+      "placa": "dhdfgh",
+      "marca": "dfghdfgh",
+      "modelo": "dfghdfgh",
+      "ano": "dfghdfg",
+      "clienteId": 4
+    },
+    {
       "id": 1,
       "placa": "ROZ-1295",
       "marca": "Toyota",
