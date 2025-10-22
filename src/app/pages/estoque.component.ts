@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../core/services/data.service';
@@ -36,7 +36,21 @@ import { Peca } from '../core/models/models';
         </div>
 
         @if (modoVisualizacao() === 'lista') {
-          <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label class="flex w-full items-center gap-2 rounded-full border border-white/10 bg-slate-900/40 px-4 py-2 text-sm text-slate-200 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" /></svg>
+                <input
+                  class="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                  type="search"
+                  placeholder="Pesquisar por código, nome ou preço"
+                  [(ngModel)]="termoBuscaValor"
+                  name="buscaPecas"
+                />
+              </label>
+              <span class="text-xs uppercase tracking-[0.3em] text-slate-400">{{ pecasFiltradas().length }} resultado(s)</span>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-white/10 bg-white/5">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-100">
                 <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
@@ -49,7 +63,12 @@ import { Peca } from '../core/models/models';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5 text-sm">
-                  @for (peca of pecas(); track peca.id) {
+                  @if (pecasFiltradas().length === 0) {
+                    <tr>
+                      <td class="px-6 py-6 text-center text-slate-400" colspan="5">Nenhuma peça encontrada com os critérios informados.</td>
+                    </tr>
+                  }
+                  @for (peca of pecasFiltradas(); track peca.id) {
                     <tr class="transition hover:bg-white/5">
                       <td class="px-6 py-4 font-medium text-white">{{ peca.codigo }}</td>
                       <td class="px-6 py-4 text-slate-200">{{ peca.nome }}</td>
@@ -69,6 +88,7 @@ import { Peca } from '../core/models/models';
                   }
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         }
@@ -128,6 +148,15 @@ import { Peca } from '../core/models/models';
               >
                 Cancelar
               </button>
+              @if (editandoId()) {
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-400/60 bg-rose-500/10 px-5 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20"
+                  (click)="excluirPeca()"
+                >
+                  Excluir peça
+                </button>
+              }
               <button
                 type="submit"
                 class="rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/40 transition hover:from-sky-400 hover:to-indigo-400"
@@ -148,6 +177,7 @@ export class EstoqueComponent {
 
   modoVisualizacao = signal<'lista' | 'formulario'>('lista');
   editandoId = signal<number | null>(null);
+  termoBusca = signal('');
 
   formulario = {
     codigo: '',
@@ -167,6 +197,19 @@ export class EstoqueComponent {
     this.modoVisualizacao.set('formulario');
   }
 
+  pecasFiltradas = computed(() => {
+    const termo = this.termoBusca().toLowerCase().trim();
+    if (!termo) {
+      return this.pecas();
+    }
+    return this.pecas().filter(peca =>
+      [peca.codigo, peca.nome, peca.preco.toString(), peca.estoque.toString()]
+        .join(' ')
+        .toLowerCase()
+        .includes(termo)
+    );
+  });
+
   editarPeca(peca: Peca) {
     this.editandoId.set(peca.id);
     this.formulario = {
@@ -178,45 +221,59 @@ export class EstoqueComponent {
     this.modoVisualizacao.set('formulario');
   }
 
-  salvarPeca() {
+  async salvarPeca() {
     if (!this.formulario.codigo || !this.formulario.nome) {
       return;
     }
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.pecas.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                codigo: this.formulario.codigo,
-                nome: this.formulario.nome,
-                estoque: Number(this.formulario.estoque),
-                preco: Number(this.formulario.preco),
-              }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.pecas().reduce((max, peca) => Math.max(max, peca.id), 0) + 1;
-      this.dataService.pecas.update(lista => [
-        {
-          id: novoId,
-          codigo: this.formulario.codigo,
-          nome: this.formulario.nome,
-          estoque: Number(this.formulario.estoque),
-          preco: Number(this.formulario.preco),
-        },
-        ...lista,
-      ]);
+    const dados = {
+      codigo: this.formulario.codigo.trim(),
+      nome: this.formulario.nome.trim(),
+      estoque: Number(this.formulario.estoque),
+      preco: Number(this.formulario.preco),
+    };
+
+    try {
+      if (this.editandoId()) {
+        await this.dataService.atualizarPeca(this.editandoId()!, dados);
+      } else {
+        await this.dataService.criarPeca(dados);
+      }
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao salvar peça', error);
+    }
+  }
+
+  async excluirPeca() {
+    if (!this.editandoId()) {
+      return;
     }
 
-    this.voltarParaLista();
+    const confirmacao = confirm('Deseja realmente excluir esta peça do estoque?');
+    if (!confirmacao) {
+      return;
+    }
+
+    try {
+      await this.dataService.removerPeca(this.editandoId()!);
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao remover peça', error);
+    }
   }
 
   voltarParaLista() {
     this.modoVisualizacao.set('lista');
     this.editandoId.set(null);
+    this.termoBusca.set('');
+  }
+
+  get termoBuscaValor() {
+    return this.termoBusca();
+  }
+
+  set termoBuscaValor(valor: string) {
+    this.termoBusca.set(valor);
   }
 }

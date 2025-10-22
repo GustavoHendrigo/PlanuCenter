@@ -36,7 +36,21 @@ import { Cliente } from '../core/models/models';
         </div>
 
         @if (modoVisualizacao() === 'lista') {
-          <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label class="flex w-full items-center gap-2 rounded-full border border-white/10 bg-slate-900/40 px-4 py-2 text-sm text-slate-200 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" /></svg>
+                <input
+                  class="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                  type="search"
+                  placeholder="Pesquisar por nome, e-mail ou telefone"
+                  [(ngModel)]="termoBuscaValor"
+                  name="buscaClientes"
+                />
+              </label>
+              <span class="text-xs uppercase tracking-[0.3em] text-slate-400">{{ clientesFiltrados().length }} resultado(s)</span>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-white/10 bg-white/5">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-100">
                 <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
@@ -48,7 +62,12 @@ import { Cliente } from '../core/models/models';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5 text-sm">
-                  @for (cliente of clientes(); track cliente.id) {
+                  @if (clientesFiltrados().length === 0) {
+                    <tr>
+                      <td class="px-6 py-6 text-center text-slate-400" colspan="4">Nenhum cliente encontrado com os critérios informados.</td>
+                    </tr>
+                  }
+                  @for (cliente of clientesFiltrados(); track cliente.id) {
                     <tr class="transition hover:bg-white/5">
                       <td class="px-6 py-4 font-medium text-white">{{ cliente.nome }}</td>
                       <td class="px-6 py-4 text-slate-200">{{ cliente.email }}</td>
@@ -67,6 +86,7 @@ import { Cliente } from '../core/models/models';
                   }
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         }
@@ -112,6 +132,15 @@ import { Cliente } from '../core/models/models';
               >
                 Cancelar
               </button>
+              @if (editandoId()) {
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-400/60 bg-rose-500/10 px-5 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20"
+                  (click)="excluirCliente()"
+                >
+                  Excluir cliente
+                </button>
+              }
               <button
                 type="submit"
                 class="rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/40 transition hover:from-sky-400 hover:to-indigo-400"
@@ -183,6 +212,7 @@ export class ClientesComponent {
   modoVisualizacao = signal<'lista' | 'formulario' | 'detalhes'>('lista');
   editandoId = signal<number | null>(null);
   clienteSelecionadoId = signal<number | null>(null);
+  termoBusca = signal('');
 
   formulario = {
     nome: '',
@@ -196,6 +226,19 @@ export class ClientesComponent {
       return undefined;
     }
     return this.clientes().find(cliente => cliente.id === id);
+  });
+
+  clientesFiltrados = computed(() => {
+    const termo = this.termoBusca().toLowerCase().trim();
+    if (!termo) {
+      return this.clientes();
+    }
+    return this.clientes().filter(cliente =>
+      [cliente.nome, cliente.email ?? '', cliente.telefone ?? '']
+        .join(' ')
+        .toLowerCase()
+        .includes(termo)
+    );
   });
 
   veiculosDoCliente = computed(() => {
@@ -230,40 +273,59 @@ export class ClientesComponent {
     this.modoVisualizacao.set('detalhes');
   }
 
-  salvarCliente() {
+  async salvarCliente() {
     if (!this.formulario.nome || !this.formulario.email || !this.formulario.telefone) {
       return;
     }
 
     const dadosNormalizados = {
       nome: this.formulario.nome.trim(),
-      email: this.formulario.email.trim(),
-      telefone: this.formulario.telefone.trim(),
+      email: this.formulario.email.trim() || undefined,
+      telefone: this.formulario.telefone.trim() || undefined,
     };
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.clientes.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? { ...item, ...dadosNormalizados }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.clientes().reduce((max, cliente) => Math.max(max, cliente.id), 0) + 1;
-      this.dataService.clientes.update(lista => [
-        { id: novoId, ...dadosNormalizados },
-        ...lista,
-      ]);
+    try {
+      if (this.editandoId()) {
+        await this.dataService.atualizarCliente(this.editandoId()!, dadosNormalizados);
+      } else {
+        await this.dataService.criarCliente(dadosNormalizados);
+      }
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao salvar cliente', error);
+    }
+  }
+
+  async excluirCliente() {
+    if (!this.editandoId()) {
+      return;
     }
 
-    this.voltarParaLista();
+    const confirmacao = confirm('Deseja realmente excluir este cliente? A ação removerá veículos e ordens relacionadas.');
+    if (!confirmacao) {
+      return;
+    }
+
+    try {
+      await this.dataService.removerCliente(this.editandoId()!);
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao remover cliente', error);
+    }
   }
 
   voltarParaLista() {
     this.modoVisualizacao.set('lista');
     this.editandoId.set(null);
     this.clienteSelecionadoId.set(null);
+    this.termoBusca.set('');
+  }
+
+  get termoBuscaValor() {
+    return this.termoBusca();
+  }
+
+  set termoBuscaValor(valor: string) {
+    this.termoBusca.set(valor);
   }
 }

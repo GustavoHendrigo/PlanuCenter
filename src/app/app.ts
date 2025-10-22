@@ -4,6 +4,7 @@ import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
 import { SidebarComponent } from './layout/sidebar.component';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +15,7 @@ import { filter, map, startWith } from 'rxjs';
 })
 export class App {
   private router = inject(Router);
+  private authService = inject(AuthService);
 
   isMobileMenuOpen = signal(false);
   private profileMenuOpen = signal(false);
@@ -29,6 +31,20 @@ export class App {
 
   isLoginRoute = computed(() => this.currentUrl().startsWith('/login'));
   isProfileMenuOpen = computed(() => this.profileMenuOpen());
+  usuarioAtual = this.authService.usuarioAtual;
+  estaAutenticado = this.authService.estaAutenticado;
+  iniciaisUsuario = computed(() => {
+    const usuario = this.usuarioAtual();
+    if (!usuario) {
+      return 'US';
+    }
+    return usuario.nome
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(parte => parte[0]?.toUpperCase() ?? '')
+      .join('') || 'US';
+  });
 
   toggleProfileMenu(): void {
     this.profileMenuOpen.update(value => !value);
@@ -37,6 +53,7 @@ export class App {
   logout(): void {
     this.profileMenuOpen.set(false);
     this.isMobileMenuOpen.set(false);
+    this.authService.logout();
     void this.router.navigate(['/login']);
   }
 }

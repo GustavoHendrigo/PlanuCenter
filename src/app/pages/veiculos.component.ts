@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../core/services/data.service';
@@ -36,7 +36,21 @@ import { Veiculo } from '../core/models/models';
         </div>
 
         @if (modoVisualizacao() === 'lista') {
-          <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div class="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label class="flex w-full items-center gap-2 rounded-full border border-white/10 bg-slate-900/40 px-4 py-2 text-sm text-slate-200 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" /></svg>
+                <input
+                  class="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
+                  type="search"
+                  placeholder="Pesquisar por placa, modelo, cliente ou ano"
+                  [(ngModel)]="termoBuscaValor"
+                  name="buscaVeiculos"
+                />
+              </label>
+              <span class="text-xs uppercase tracking-[0.3em] text-slate-400">{{ veiculosFiltrados().length }} resultado(s)</span>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-white/10 bg-white/5">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-100">
                 <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
@@ -50,7 +64,12 @@ import { Veiculo } from '../core/models/models';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5 text-sm">
-                  @for (veiculo of veiculos(); track veiculo.id) {
+                  @if (veiculosFiltrados().length === 0) {
+                    <tr>
+                      <td class="px-6 py-6 text-center text-slate-400" colspan="6">Nenhum veículo encontrado com os critérios informados.</td>
+                    </tr>
+                  }
+                  @for (veiculo of veiculosFiltrados(); track veiculo.id) {
                     <tr class="transition hover:bg-white/5">
                       <td class="px-6 py-4 font-medium text-white">{{ veiculo.placa }}</td>
                       <td class="px-6 py-4 text-slate-200">{{ veiculo.marca }}</td>
@@ -71,6 +90,7 @@ import { Veiculo } from '../core/models/models';
                   }
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         }
@@ -141,6 +161,15 @@ import { Veiculo } from '../core/models/models';
               >
                 Cancelar
               </button>
+              @if (editandoId()) {
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-400/60 bg-rose-500/10 px-5 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20"
+                  (click)="excluirVeiculo()"
+                >
+                  Excluir veículo
+                </button>
+              }
               <button
                 type="submit"
                 class="rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-950/40 transition hover:from-sky-400 hover:to-indigo-400"
@@ -162,6 +191,7 @@ export class VeiculosComponent {
 
   modoVisualizacao = signal<'lista' | 'formulario'>('lista');
   editandoId = signal<number | null>(null);
+  termoBusca = signal('');
 
   formulario = {
     placa: '',
@@ -195,7 +225,20 @@ export class VeiculosComponent {
     this.modoVisualizacao.set('formulario');
   }
 
-  salvarVeiculo() {
+  veiculosFiltrados = computed(() => {
+    const termo = this.termoBusca().toLowerCase().trim();
+    if (!termo) {
+      return this.veiculos();
+    }
+    return this.veiculos().filter(veiculo =>
+      [veiculo.placa, veiculo.marca, veiculo.modelo, veiculo.ano, veiculo.clienteNome]
+        .join(' ')
+        .toLowerCase()
+        .includes(termo)
+    );
+  });
+
+  async salvarVeiculo() {
     if (!this.formulario.placa || !this.formulario.marca || !this.formulario.modelo || !this.formulario.ano || !this.formulario.clienteId) {
       return;
     }
@@ -205,40 +248,42 @@ export class VeiculosComponent {
       return;
     }
 
-    if (this.editandoId()) {
-      const idParaAtualizar = this.editandoId()!;
-      this.dataService.veiculos.update(lista =>
-        lista.map(item =>
-          item.id === idParaAtualizar
-            ? {
-                ...item,
-                placa: this.formulario.placa,
-                marca: this.formulario.marca,
-                modelo: this.formulario.modelo,
-                ano: this.formulario.ano,
-                clienteId: cliente.id,
-                clienteNome: cliente.nome,
-              }
-            : item,
-        ),
-      );
-    } else {
-      const novoId = this.dataService.veiculos().reduce((max, v) => Math.max(max, v.id), 0) + 1;
-      this.dataService.veiculos.update(lista => [
-        {
-          id: novoId,
-          placa: this.formulario.placa,
-          marca: this.formulario.marca,
-          modelo: this.formulario.modelo,
-          ano: this.formulario.ano,
-          clienteId: cliente.id,
-          clienteNome: cliente.nome,
-        },
-        ...lista,
-      ]);
+    const dados = {
+      placa: this.formulario.placa.trim(),
+      marca: this.formulario.marca.trim(),
+      modelo: this.formulario.modelo.trim(),
+      ano: this.formulario.ano.trim(),
+      clienteId: cliente.id,
+    };
+
+    try {
+      if (this.editandoId()) {
+        await this.dataService.atualizarVeiculo(this.editandoId()!, dados);
+      } else {
+        await this.dataService.criarVeiculo(dados);
+      }
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao salvar veículo', error);
+    }
+  }
+
+  async excluirVeiculo() {
+    if (!this.editandoId()) {
+      return;
     }
 
-    this.voltarParaLista();
+    const confirmacao = confirm('Deseja realmente excluir este veículo? Ordens vinculadas a ele serão removidas.');
+    if (!confirmacao) {
+      return;
+    }
+
+    try {
+      await this.dataService.removerVeiculo(this.editandoId()!);
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao remover veículo', error);
+    }
   }
 
   private obterClienteSelecionado() {
@@ -251,5 +296,14 @@ export class VeiculosComponent {
   voltarParaLista() {
     this.modoVisualizacao.set('lista');
     this.editandoId.set(null);
+    this.termoBusca.set('');
+  }
+
+  get termoBuscaValor() {
+    return this.termoBusca();
+  }
+
+  set termoBuscaValor(valor: string) {
+    this.termoBusca.set(valor);
   }
 }

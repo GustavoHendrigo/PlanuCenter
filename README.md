@@ -4,13 +4,37 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
-To start a local development server, run:
+This project now possui um backend Node.js simples responsável por persistir os dados em `server/database.json`. Para desenvolver:
 
-```bash
-ng serve
-```
+1. Em um terminal, inicie a API local:
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+   ```bash
+   npm run server
+   ```
+
+   O serviço estará disponível em `http://localhost:3000/api`.
+
+2. Em outro terminal, suba a aplicação Angular:
+
+   ```bash
+   ng serve
+   ```
+
+   Acesse `http://localhost:4200/` no navegador. As alterações nos arquivos front-end recarregam automaticamente a página.
+
+> **Evite erros no console**: Se o frontend for aberto sem a API rodando, as chamadas HTTP resultarão em mensagens de erro. O serviço de dados agora entra automaticamente em um **modo offline** e exibe informações locais somente leitura, mas para trabalhar com dados reais (e impedir as mensagens de erro) mantenha `npm run server` ativo em paralelo ao `ng serve`.
+
+### Credenciais padrão
+
+Para testar o fluxo completo de autenticação foi incluído um usuário administrador:
+
+| Perfil | E-mail | Senha |
+| ------ | ------ | ----- |
+| Admin | `admin@oficinapro.com` | `admin123` |
+
+Também existe um usuário de atendimento (`atendimento@oficinapro.com` / `atendimento123`) que pode ser utilizado para cenários de demonstração.
+
+Após o login, todos os módulos de clientes, veículos, estoque e ordens de serviço passam a permitir pesquisa instantânea, impressão do resumo de cada ordem e exclusão segura de registros diretamente pela interface.
 
 ## Code scaffolding
 
