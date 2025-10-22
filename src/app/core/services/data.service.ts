@@ -88,6 +88,7 @@ export class DataService {
   private http = inject(HttpClient);
   private readonly apiUrl = 'http://localhost:3000/api';
   private readonly offlineState: OfflineDatabase = deepClone(OFFLINE_DATA);
+  private notificouFalhaApi = false;
 
   readonly clientes = signal<Cliente[]>([]);
   readonly veiculos = signal<Veiculo[]>([]);
@@ -119,7 +120,7 @@ export class DataService {
       const clientes = await firstValueFrom(this.http.get<Cliente[]>(`${this.apiUrl}/clientes`));
       this.atualizarClientes(clientes);
     } catch (error) {
-      console.error('Erro ao carregar clientes', error);
+      this.registrarFalhaApi('clientes');
       this.ativarModoOffline();
     }
   }
@@ -135,7 +136,7 @@ export class DataService {
       this.offlineState.clientes = deepClone(this.clientes());
       return novo;
     } catch (error) {
-      console.error('Erro ao criar cliente', error);
+      this.registrarFalhaApi('clientes');
       this.ativarModoOffline();
       return this.criarClienteOffline(dados);
     }
@@ -153,7 +154,7 @@ export class DataService {
       await this.carregarVeiculos();
       return atualizado;
     } catch (error) {
-      console.error('Erro ao atualizar cliente', error);
+      this.registrarFalhaApi('clientes');
       this.ativarModoOffline();
       return this.atualizarClienteOffline(id, dados);
     }
@@ -174,7 +175,7 @@ export class DataService {
       this.offlineState.veiculos = deepClone(this.veiculos());
       this.offlineState.ordensServico = deepClone(this.ordensServico());
     } catch (error) {
-      console.error('Erro ao remover cliente', error);
+      this.registrarFalhaApi('clientes');
       this.ativarModoOffline();
       this.removerClienteOffline(id);
     }
@@ -189,7 +190,7 @@ export class DataService {
       const veiculos = await firstValueFrom(this.http.get<Veiculo[]>(`${this.apiUrl}/veiculos`));
       this.atualizarVeiculos(veiculos);
     } catch (error) {
-      console.error('Erro ao carregar veículos', error);
+      this.registrarFalhaApi('veículos');
       this.ativarModoOffline();
     }
   }
@@ -205,7 +206,7 @@ export class DataService {
       this.offlineState.veiculos = deepClone(this.veiculos());
       return novo;
     } catch (error) {
-      console.error('Erro ao criar veículo', error);
+      this.registrarFalhaApi('veículos');
       this.ativarModoOffline();
       return this.criarVeiculoOffline(dados);
     }
@@ -222,7 +223,7 @@ export class DataService {
       this.offlineState.veiculos = deepClone(this.veiculos());
       return atualizado;
     } catch (error) {
-      console.error('Erro ao atualizar veículo', error);
+      this.registrarFalhaApi('veículos');
       this.ativarModoOffline();
       return this.atualizarVeiculoOffline(id, dados);
     }
@@ -241,7 +242,7 @@ export class DataService {
       this.offlineState.veiculos = deepClone(this.veiculos());
       this.offlineState.ordensServico = deepClone(this.ordensServico());
     } catch (error) {
-      console.error('Erro ao remover veículo', error);
+      this.registrarFalhaApi('veículos');
       this.ativarModoOffline();
       this.removerVeiculoOffline(id);
     }
@@ -256,7 +257,7 @@ export class DataService {
       const pecas = await firstValueFrom(this.http.get<Peca[]>(`${this.apiUrl}/pecas`));
       this.atualizarPecas(pecas);
     } catch (error) {
-      console.error('Erro ao carregar peças', error);
+      this.registrarFalhaApi('peças');
       this.ativarModoOffline();
     }
   }
@@ -272,7 +273,7 @@ export class DataService {
       this.offlineState.pecas = deepClone(this.pecas());
       return nova;
     } catch (error) {
-      console.error('Erro ao criar peça', error);
+      this.registrarFalhaApi('peças');
       this.ativarModoOffline();
       return this.criarPecaOffline(dados);
     }
@@ -289,7 +290,7 @@ export class DataService {
       this.offlineState.pecas = deepClone(this.pecas());
       return atualizada;
     } catch (error) {
-      console.error('Erro ao atualizar peça', error);
+      this.registrarFalhaApi('peças');
       this.ativarModoOffline();
       return this.atualizarPecaOffline(id, dados);
     }
@@ -313,7 +314,7 @@ export class DataService {
       this.offlineState.pecas = deepClone(this.pecas());
       this.offlineState.ordensServico = deepClone(this.ordensServico());
     } catch (error) {
-      console.error('Erro ao remover peça', error);
+      this.registrarFalhaApi('peças');
       this.ativarModoOffline();
       this.removerPecaOffline(id);
     }
@@ -328,7 +329,7 @@ export class DataService {
       const servicos = await firstValueFrom(this.http.get<Servico[]>(`${this.apiUrl}/servicos`));
       this.atualizarServicos(servicos);
     } catch (error) {
-      console.error('Erro ao carregar serviços', error);
+      this.registrarFalhaApi('serviços');
       this.ativarModoOffline();
     }
   }
@@ -342,7 +343,7 @@ export class DataService {
       const ordens = await firstValueFrom(this.http.get<OrdemServico[]>(`${this.apiUrl}/ordens-servico`));
       this.atualizarOrdens(ordens);
     } catch (error) {
-      console.error('Erro ao carregar ordens de serviço', error);
+      this.registrarFalhaApi('ordens de serviço');
       this.ativarModoOffline();
     }
   }
@@ -358,7 +359,7 @@ export class DataService {
       this.offlineState.ordensServico = deepClone(this.ordensServico());
       return nova;
     } catch (error) {
-      console.error('Erro ao criar ordem de serviço', error);
+      this.registrarFalhaApi('ordens de serviço');
       this.ativarModoOffline();
       return this.criarOrdemOffline(dados);
     }
@@ -375,7 +376,7 @@ export class DataService {
       this.offlineState.ordensServico = deepClone(this.ordensServico());
       return atualizada;
     } catch (error) {
-      console.error('Erro ao atualizar ordem de serviço', error);
+      this.registrarFalhaApi('ordens de serviço');
       this.ativarModoOffline();
       return this.atualizarOrdemOffline(id, dados);
     }
@@ -392,7 +393,7 @@ export class DataService {
       this.ordensServico.update(lista => lista.filter(ordem => ordem.id !== id));
       this.offlineState.ordensServico = deepClone(this.ordensServico());
     } catch (error) {
-      console.error('Erro ao remover ordem de serviço', error);
+      this.registrarFalhaApi('ordens de serviço');
       this.ativarModoOffline();
       this.removerOrdemOffline(id);
     }
@@ -402,12 +403,22 @@ export class DataService {
     return this.ordensServico().find(os => os.id === id);
   }
 
+  private registrarFalhaApi(contexto: string) {
+    if (this.notificouFalhaApi) {
+      return;
+    }
+    this.notificouFalhaApi = true;
+    console.warn(`Não foi possível conectar à API (${contexto}). Os dados locais serão utilizados.`);
+  }
+
   private ativarModoOffline() {
     if (this.modoOffline()) {
       return;
     }
     this.modoOffline.set(true);
-    console.warn('API indisponível. Entrando em modo offline com dados locais.');
+    if (!this.notificouFalhaApi) {
+      console.warn('API indisponível. Entrando em modo offline com dados locais.');
+    }
     this.reaplicarClientesOffline();
     this.reaplicarVeiculosOffline();
     this.reaplicarPecasOffline();
