@@ -17,6 +17,109 @@ const {
 } = require('./db');
 
 const PORT = process.env.PORT || 3000;
+const STATUS_VALIDOS = new Set(['Em Andamento', 'Aguardando Aprovação', 'Finalizada', 'Cancelada']);
+
+function numeroInteiroPositivo(valor) {
+  const numero = Number(valor);
+  if (!Number.isInteger(numero) || numero <= 0) {
+    return null;
+  }
+  return numero;
+}
+
+function validarCliente(clienteId) {
+  const id = numeroInteiroPositivo(clienteId);
+  if (id == null) {
+    return { erro: 'Cliente informado é inválido.' };
+  }
+  const cliente = getClientes().find(item => item.id === id);
+  if (!cliente) {
+    return { erro: 'Cliente informado não existe.' };
+  }
+  return { id, cliente };
+}
+
+function validarVeiculo(veiculoId) {
+  const id = numeroInteiroPositivo(veiculoId);
+  if (id == null) {
+    return { erro: 'Veículo informado é inválido.' };
+  }
+  const veiculo = getVeiculos().find(item => item.id === id);
+  if (!veiculo) {
+    return { erro: 'Veículo informado não existe.' };
+  }
+  return { id, veiculo };
+}
+
+function sanitizarServicos(servicos) {
+  if (servicos == null) {
+    return { itens: [] };
+  }
+  if (!Array.isArray(servicos)) {
+    return { erro: 'Formato de serviços inválido.' };
+  }
+
+  const existentes = new Map(getServicos().map(item => [item.id, item]));
+  const acumulado = new Map();
+
+  for (const servico of servicos) {
+    const id = numeroInteiroPositivo(servico?.id);
+    if (id == null) {
+      return { erro: 'Serviço informado é inválido.' };
+    }
+    if (!existentes.has(id)) {
+      return { erro: 'Serviço informado não existe.' };
+    }
+    const qtde = numeroInteiroPositivo(servico?.qtde);
+    if (qtde == null) {
+      return { erro: 'Quantidade inválida para o serviço informado.' };
+    }
+    acumulado.set(id, (acumulado.get(id) || 0) + qtde);
+  }
+
+  return {
+    itens: [...acumulado.entries()].map(([id, qtde]) => ({ id, qtde }))
+  };
+}
+
+function sanitizarPecas(pecas) {
+  if (pecas == null) {
+    return { itens: [] };
+  }
+  if (!Array.isArray(pecas)) {
+    return { erro: 'Formato de peças inválido.' };
+  }
+
+  const existentes = new Map(getPecas().map(item => [item.id, item]));
+  const acumulado = new Map();
+
+  for (const peca of pecas) {
+    const id = numeroInteiroPositivo(peca?.id);
+    if (id == null) {
+      return { erro: 'Peça informada é inválida.' };
+    }
+    if (!existentes.has(id)) {
+      return { erro: 'Peça informada não existe.' };
+    }
+    const qtde = numeroInteiroPositivo(peca?.qtde);
+    if (qtde == null) {
+      return { erro: 'Quantidade inválida para a peça informada.' };
+    }
+    acumulado.set(id, (acumulado.get(id) || 0) + qtde);
+  }
+
+  return {
+    itens: [...acumulado.entries()].map(([id, qtde]) => ({ id, qtde }))
+  };
+}
+
+function dataValida(valor) {
+  if (typeof valor !== 'string' || !valor.trim()) {
+    return false;
+  }
+  const data = new Date(valor);
+  return !Number.isNaN(data.getTime());
+}
 
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -139,21 +242,36 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && pathname === '/api/veiculos') {
       parseBody(req, res, body => {
         const { placa, marca, modelo, ano, clienteId } = body || {};
-        if (!placa || !marca || !modelo || !ano || !clienteId) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
+
+        const placaNormalizada = typeof placa === 'string' ? placa.trim().toUpperCase() : '';
+        const marcaNormalizada = typeof marca === 'string' ? marca.trim() : '';
+        const modeloNormalizado = typeof modelo === 'string' ? modelo.trim() : '';
+        const anoNormalizado = typeof ano === 'string' ? ano.trim() : '';
+        const clienteValidado = validarCliente(clienteId);
+
+        if (!placaNormalizada || !marcaNormalizada || !modeloNormalizado || !anoNormalizado) {
+          sendJson(res, 400, { message: 'Dados obrigatórios ausentes ou inválidos.' });
           return;
         }
-        const jaExiste = getVeiculos().some(v => v.placa.toLowerCase() === placa.trim().toLowerCase());
+        if (clienteValidado.erro) {
+          sendJson(res, 400, { message: clienteValidado.erro });
+          return;
+        }
+
+        const jaExiste = getVeiculos().some(
+          v => v.placa.toUpperCase() === placaNormalizada
+        );
         if (jaExiste) {
           sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
           return;
         }
+
         const novo = addVeiculo({
-          placa: placa.trim(),
-          marca: marca.trim(),
-          modelo: modelo.trim(),
-          ano: ano.trim(),
-          clienteId: Number(clienteId)
+          placa: placaNormalizada,
+          marca: marcaNormalizada,
+          modelo: modeloNormalizado,
+          ano: anoNormalizado,
+          clienteId: clienteValidado.id
         });
         sendJson(res, 201, mapVeiculo(novo));
       });
@@ -164,21 +282,36 @@ const server = http.createServer((req, res) => {
       const id = Number(pathname.split('/').pop());
       parseBody(req, res, body => {
         const { placa, marca, modelo, ano, clienteId } = body || {};
-        if (!placa || !marca || !modelo || !ano || !clienteId) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
+
+        const placaNormalizada = typeof placa === 'string' ? placa.trim().toUpperCase() : '';
+        const marcaNormalizada = typeof marca === 'string' ? marca.trim() : '';
+        const modeloNormalizado = typeof modelo === 'string' ? modelo.trim() : '';
+        const anoNormalizado = typeof ano === 'string' ? ano.trim() : '';
+        const clienteValidado = validarCliente(clienteId);
+
+        if (!placaNormalizada || !marcaNormalizada || !modeloNormalizado || !anoNormalizado) {
+          sendJson(res, 400, { message: 'Dados obrigatórios ausentes ou inválidos.' });
           return;
         }
-        const outroVeiculo = getVeiculos().find(v => v.placa.toLowerCase() === placa.trim().toLowerCase() && v.id !== id);
+        if (clienteValidado.erro) {
+          sendJson(res, 400, { message: clienteValidado.erro });
+          return;
+        }
+
+        const outroVeiculo = getVeiculos().find(
+          v => v.placa.toUpperCase() === placaNormalizada && v.id !== id
+        );
         if (outroVeiculo) {
           sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
           return;
         }
+
         const atualizado = updateVeiculo(id, {
-          placa: placa.trim(),
-          marca: marca.trim(),
-          modelo: modelo.trim(),
-          ano: ano.trim(),
-          clienteId: Number(clienteId)
+          placa: placaNormalizada,
+          marca: marcaNormalizada,
+          modelo: modeloNormalizado,
+          ano: anoNormalizado,
+          clienteId: clienteValidado.id
         });
         if (!atualizado) {
           sendJson(res, 404, { message: 'Veículo não encontrado.' });
@@ -261,18 +394,54 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'POST' && pathname === '/api/ordens-servico') {
       parseBody(req, res, body => {
-        const { clienteId, veiculoId, dataEntrada, status, servicos = [], pecas = [], observacoes } = body || {};
-        if (!clienteId || !veiculoId || !dataEntrada || !status) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
+        const { clienteId, veiculoId, dataEntrada, status, servicos, pecas, observacoes } = body || {};
+
+        const clienteValidado = validarCliente(clienteId);
+        if (clienteValidado.erro) {
+          sendJson(res, 400, { message: clienteValidado.erro });
           return;
         }
+
+        const veiculoValidado = validarVeiculo(veiculoId);
+        if (veiculoValidado.erro) {
+          sendJson(res, 400, { message: veiculoValidado.erro });
+          return;
+        }
+
+        if (veiculoValidado.veiculo.clienteId !== clienteValidado.id) {
+          sendJson(res, 400, { message: 'Veículo informado não pertence ao cliente selecionado.' });
+          return;
+        }
+
+        if (!dataValida(dataEntrada)) {
+          sendJson(res, 400, { message: 'Data de entrada inválida.' });
+          return;
+        }
+
+        if (typeof status !== 'string' || !STATUS_VALIDOS.has(status)) {
+          sendJson(res, 400, { message: 'Status inválido.' });
+          return;
+        }
+
+        const servicosSanitizados = sanitizarServicos(servicos);
+        if (servicosSanitizados.erro) {
+          sendJson(res, 400, { message: servicosSanitizados.erro });
+          return;
+        }
+
+        const pecasSanitizadas = sanitizarPecas(pecas);
+        if (pecasSanitizadas.erro) {
+          sendJson(res, 400, { message: pecasSanitizadas.erro });
+          return;
+        }
+
         const nova = addOrdemServico({
-          clienteId: Number(clienteId),
-          veiculoId: Number(veiculoId),
-          dataEntrada,
+          clienteId: clienteValidado.id,
+          veiculoId: veiculoValidado.id,
+          dataEntrada: dataEntrada.trim(),
           status,
-          servicos: Array.isArray(servicos) ? servicos : [],
-          pecas: Array.isArray(pecas) ? pecas : [],
+          servicos: servicosSanitizados.itens,
+          pecas: pecasSanitizadas.itens,
           observacoes: observacoes?.trim() || undefined
         });
         sendJson(res, 201, mapOrdem(nova));
@@ -283,18 +452,54 @@ const server = http.createServer((req, res) => {
     if (req.method === 'PUT' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
       const id = Number(pathname.split('/').pop());
       parseBody(req, res, body => {
-        const { clienteId, veiculoId, dataEntrada, status, servicos = [], pecas = [], observacoes } = body || {};
-        if (!clienteId || !veiculoId || !dataEntrada || !status) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
+        const { clienteId, veiculoId, dataEntrada, status, servicos, pecas, observacoes } = body || {};
+
+        const clienteValidado = validarCliente(clienteId);
+        if (clienteValidado.erro) {
+          sendJson(res, 400, { message: clienteValidado.erro });
           return;
         }
+
+        const veiculoValidado = validarVeiculo(veiculoId);
+        if (veiculoValidado.erro) {
+          sendJson(res, 400, { message: veiculoValidado.erro });
+          return;
+        }
+
+        if (veiculoValidado.veiculo.clienteId !== clienteValidado.id) {
+          sendJson(res, 400, { message: 'Veículo informado não pertence ao cliente selecionado.' });
+          return;
+        }
+
+        if (!dataValida(dataEntrada)) {
+          sendJson(res, 400, { message: 'Data de entrada inválida.' });
+          return;
+        }
+
+        if (typeof status !== 'string' || !STATUS_VALIDOS.has(status)) {
+          sendJson(res, 400, { message: 'Status inválido.' });
+          return;
+        }
+
+        const servicosSanitizados = sanitizarServicos(servicos);
+        if (servicosSanitizados.erro) {
+          sendJson(res, 400, { message: servicosSanitizados.erro });
+          return;
+        }
+
+        const pecasSanitizadas = sanitizarPecas(pecas);
+        if (pecasSanitizadas.erro) {
+          sendJson(res, 400, { message: pecasSanitizadas.erro });
+          return;
+        }
+
         const atualizada = updateOrdemServico(id, {
-          clienteId: Number(clienteId),
-          veiculoId: Number(veiculoId),
-          dataEntrada,
+          clienteId: clienteValidado.id,
+          veiculoId: veiculoValidado.id,
+          dataEntrada: dataEntrada.trim(),
           status,
-          servicos: Array.isArray(servicos) ? servicos : [],
-          pecas: Array.isArray(pecas) ? pecas : [],
+          servicos: servicosSanitizados.itens,
+          pecas: pecasSanitizadas.itens,
           observacoes: observacoes?.trim() || undefined
         });
         if (!atualizada) {
