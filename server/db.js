@@ -68,6 +68,15 @@ const defaultData = {
       pecas: [{ id: 101, qtde: 1 }, { id: 104, qtde: 1 }],
       observacoes: 'Veículo entregue ao cliente.'
     }
+  ],
+  usuarios: [
+    {
+      id: 1,
+      nome: 'Administrador',
+      email: 'admin@planucenter.com',
+      senhaHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+      perfil: 'admin'
+    }
   ]
 };
 
@@ -119,6 +128,10 @@ function getServicos() {
 
 function getOrdensServico() {
   return data.ordensServico;
+}
+
+function getUsuarios() {
+  return data.usuarios;
 }
 
 function nextId(collectionName) {
@@ -215,12 +228,80 @@ function updateOrdemServico(id, updates) {
   return atualizada;
 }
 
+function deleteCliente(id) {
+  const exists = data.clientes.some(cliente => cliente.id === id);
+  if (!exists) {
+    return false;
+  }
+
+  const veiculosRemovidos = new Set();
+
+  data.clientes = data.clientes.filter(cliente => cliente.id !== id);
+  data.veiculos = data.veiculos.filter(veiculo => {
+    if (veiculo.clienteId === id) {
+      veiculosRemovidos.add(veiculo.id);
+      return false;
+    }
+    return true;
+  });
+
+  if (veiculosRemovidos.size > 0) {
+    data.ordensServico = data.ordensServico.filter(ordem => !veiculosRemovidos.has(ordem.veiculoId));
+  }
+
+  data.ordensServico = data.ordensServico.filter(ordem => ordem.clienteId !== id);
+
+  saveDatabase();
+  return true;
+}
+
+function deleteVeiculo(id) {
+  const exists = data.veiculos.some(veiculo => veiculo.id === id);
+  if (!exists) {
+    return false;
+  }
+
+  data.veiculos = data.veiculos.filter(veiculo => veiculo.id !== id);
+  data.ordensServico = data.ordensServico.filter(ordem => ordem.veiculoId !== id);
+
+  saveDatabase();
+  return true;
+}
+
+function deletePeca(id) {
+  const exists = data.pecas.some(peca => peca.id === id);
+  if (!exists) {
+    return false;
+  }
+
+  data.pecas = data.pecas.filter(peca => peca.id !== id);
+  data.ordensServico = data.ordensServico.map(ordem => ({
+    ...ordem,
+    pecas: ordem.pecas.filter(item => item.id !== id)
+  }));
+
+  saveDatabase();
+  return true;
+}
+
+function deleteOrdemServico(id) {
+  const exists = data.ordensServico.some(ordem => ordem.id === id);
+  if (!exists) {
+    return false;
+  }
+
+  data.ordensServico = data.ordensServico.filter(ordem => ordem.id !== id);
+  saveDatabase();
+  return true;
+}
+
 module.exports = {
   getClientes,
   getVeiculos,
   getPecas,
   getServicos,
   getOrdensServico,
+  getUsuarios,
   addCliente,
   updateCliente,
   addVeiculo,
@@ -229,6 +310,10 @@ module.exports = {
   updatePeca,
   addOrdemServico,
   updateOrdemServico,
+  deleteCliente,
+  deleteVeiculo,
+  deletePeca,
+  deleteOrdemServico,
   nextId,
   saveDatabase,
   data

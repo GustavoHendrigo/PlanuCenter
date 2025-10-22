@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../core/services/data.service';
@@ -36,7 +36,21 @@ import { Peca } from '../core/models/models';
         </div>
 
         @if (modoVisualizacao() === 'lista') {
-          <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex-1">
+                <label class="block text-xs font-semibold uppercase tracking-[0.35em] text-slate-300/80">Pesquisar</label>
+                <input
+                  type="search"
+                  class="mt-2 w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-400 shadow-inner shadow-slate-950/40 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40"
+                  placeholder="Buscar por código ou nome"
+                  [ngModel]="termoBusca()"
+                  (ngModelChange)="termoBusca.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-100">
                 <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
@@ -49,7 +63,8 @@ import { Peca } from '../core/models/models';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5 text-sm">
-                  @for (peca of pecas(); track peca.id) {
+                  @if (pecasFiltradas().length) {
+                    @for (peca of pecasFiltradas(); track peca.id) {
                     <tr class="transition hover:bg-white/5">
                       <td class="px-6 py-4 font-medium text-white">{{ peca.codigo }}</td>
                       <td class="px-6 py-4 text-slate-200">{{ peca.nome }}</td>
@@ -66,10 +81,16 @@ import { Peca } from '../core/models/models';
                         </div>
                       </td>
                     </tr>
+                    }
+                  } @else {
+                    <tr>
+                      <td colspan="5" class="px-6 py-6 text-center text-sm text-slate-300">Nenhuma peça encontrada para o filtro aplicado.</td>
+                    </tr>
                   }
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         }
 
@@ -121,6 +142,16 @@ import { Peca } from '../core/models/models';
             </label>
 
             <div class="md:col-span-2 flex flex-wrap justify-end gap-3">
+              @if (editandoId()) {
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-500/50 bg-rose-500/10 px-5 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  [disabled]="excluindo()"
+                  (click)="excluirPeca()"
+                >
+                  {{ excluindo() ? 'Excluindo...' : 'Excluir peça' }}
+                </button>
+              }
               <button
                 type="button"
                 class="rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10"
@@ -148,6 +179,8 @@ export class EstoqueComponent {
 
   modoVisualizacao = signal<'lista' | 'formulario'>('lista');
   editandoId = signal<number | null>(null);
+  termoBusca = signal('');
+  excluindo = signal(false);
 
   formulario = {
     codigo: '',
@@ -155,6 +188,20 @@ export class EstoqueComponent {
     estoque: 0,
     preco: 0,
   };
+
+  pecasFiltradas = computed(() => {
+    const termo = this.termoBusca().trim().toLowerCase();
+    if (!termo) {
+      return this.pecas();
+    }
+
+    return this.pecas().filter(peca => {
+      const comparaveis = [peca.codigo, peca.nome]
+        .filter(Boolean)
+        .map(valor => valor!.toLowerCase());
+      return comparaveis.some(valor => valor.includes(termo));
+    });
+  });
 
   abrirFormularioNovo() {
     this.editandoId.set(null);
@@ -202,8 +249,30 @@ export class EstoqueComponent {
     }
   }
 
+  async excluirPeca() {
+    if (!this.editandoId()) {
+      return;
+    }
+
+    const confirmar = window.confirm('Deseja realmente excluir esta peça do estoque?');
+    if (!confirmar) {
+      return;
+    }
+
+    this.excluindo.set(true);
+    try {
+      await this.dataService.excluirPeca(this.editandoId()!);
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao excluir peça', error);
+    } finally {
+      this.excluindo.set(false);
+    }
+  }
+
   voltarParaLista() {
     this.modoVisualizacao.set('lista');
     this.editandoId.set(null);
+    this.excluindo.set(false);
   }
 }

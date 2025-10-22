@@ -48,3 +48,10 @@ export interface MenuItem {
   path: string;
   iconPath: string;
 }
+
+export interface UsuarioAutenticado {
+  id: number;
+  nome: string;
+  email: string;
+  perfil: 'admin' | 'usuario';
+}

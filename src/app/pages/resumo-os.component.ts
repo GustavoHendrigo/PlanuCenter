@@ -1,8 +1,9 @@
-import { Component, computed, inject, Input, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DataService } from '../core/services/data.service';
-import { OrdemServico, Veiculo, Cliente, Servico, Peca } from '../core/models/models';
-import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-resumo-os',
@@ -116,12 +117,11 @@ import { RouterLink } from '@angular/router';
 })
 export class ResumoOsComponent {
   private dataService = inject(DataService);
-  private osId = signal<number>(0);
-
-  @Input()
-  set id(osId: string) {
-    this.osId.set(Number(osId));
-  }
+  private route = inject(ActivatedRoute);
+  private osId = toSignal(
+    this.route.paramMap.pipe(map(params => Number(params.get('id')) || 0)),
+    { initialValue: Number(this.route.snapshot.paramMap.get('id')) || 0 }
+  );
 
   osDetails = computed(() => {
     const os = this.dataService.getOrdemServicoById(this.osId());
