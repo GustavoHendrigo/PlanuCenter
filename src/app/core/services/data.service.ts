@@ -100,10 +100,26 @@ export class DataService {
   readonly modoOffline = signal(false);
 
   constructor() {
+    this.aplicarInstantaneoOffline();
     void this.carregarDadosIniciais();
   }
 
+  private aplicarInstantaneoOffline() {
+    this.reaplicarClientesOffline();
+    this.reaplicarVeiculosOffline();
+    this.reaplicarPecasOffline();
+    this.reaplicarServicosOffline();
+    this.reaplicarOrdensOffline();
+  }
+
   async carregarDadosIniciais() {
+    const sincronizacaoDisponivel = await this.garantirApiDisponivel('sincronização inicial');
+    if (!sincronizacaoDisponivel) {
+      return;
+    }
+
+    this.modoOffline.set(false);
+
     await Promise.all([
       this.carregarClientes(),
       this.carregarVeiculos(),
@@ -518,11 +534,7 @@ export class DataService {
     if (!this.notificouFalhaApi) {
       console.warn('API indisponível. Entrando em modo offline com dados locais.');
     }
-    this.reaplicarClientesOffline();
-    this.reaplicarVeiculosOffline();
-    this.reaplicarPecasOffline();
-    this.reaplicarServicosOffline();
-    this.reaplicarOrdensOffline();
+    this.aplicarInstantaneoOffline();
   }
 
   private gerarProximoId(lista: { id: number }[]) {
