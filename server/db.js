@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 
 const DB_FILE = path.join(__dirname, 'database.json');
@@ -75,144 +75,203 @@ function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function loadDatabase() {
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
-    return clone(defaultData);
+class JsonDatabase {
+  constructor(filePath, seed) {
+    this.filePath = filePath;
+    this.seed = seed;
+    this.ready = this.#init();
+    this.mutex = Promise.resolve();
   }
 
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    if (!raw.trim()) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
-      return clone(defaultData);
+  async #init() {
+    try {
+      const raw = await fs.readFile(this.filePath, 'utf-8');
+      const trimmed = raw.trim();
+      if (!trimmed) {
+        await this.#write(this.seed);
+        return;
+      }
+      this.data = JSON.parse(trimmed);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.error('Erro ao ler banco de dados, recriando arquivo.', error);
+      }
+      await this.#write(this.seed);
     }
-    return JSON.parse(raw);
-  } catch (error) {
-    console.error('Erro ao ler banco de dados, recriando arquivo.', error);
-    fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
-    return clone(defaultData);
+  }
+
+  async #write(data) {
+    this.data = clone(data);
+    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+    await fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2));
+  }
+
+  async #ensureReady() {
+    await this.ready;
+    if (!this.data) {
+      this.data = clone(this.seed);
+    }
+  }
+
+  #snapshot() {
+    return clone(this.data);
+  }
+
+  async list(collection) {
+    await this.#ensureReady();
+    return clone(this.data[collection]);
+  }
+
+  async findById(collection, id) {
+    await this.#ensureReady();
+    return clone(this.data[collection].find(item => item.id === id));
+  }
+
+  async transact(mutator) {
+    const run = async () => {
+      await this.#ensureReady();
+      const draft = this.#snapshot();
+      let shouldPersist = false;
+      const markDirty = () => {
+        shouldPersist = true;
+      };
+      const result = await mutator(draft, markDirty);
+      if (shouldPersist) {
+        await this.#write(draft);
+      }
+      return result;
+    };
+
+    const execution = this.mutex.then(run, run);
+    this.mutex = execution.catch(() => {});
+    return execution;
   }
 }
 
-let data = loadDatabase();
+const db = new JsonDatabase(DB_FILE, defaultData);
 
-function saveDatabase() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+async function getClientes() {
+  return db.list('clientes');
 }
 
-function getClientes() {
-  return data.clientes;
+async function getVeiculos() {
+  return db.list('veiculos');
 }
 
-function getVeiculos() {
-  return data.veiculos;
+async function getPecas() {
+  return db.list('pecas');
 }
 
-function getPecas() {
-  return data.pecas;
+async function getServicos() {
+  return db.list('servicos');
 }
 
-function getServicos() {
-  return data.servicos;
+async function getOrdensServico() {
+  return db.list('ordensServico');
 }
 
-function getOrdensServico() {
-  return data.ordensServico;
-}
-
-function nextId(collectionName) {
-  const collection = data[collectionName];
+async function nextId(collectionName) {
+  const collection = await db.list(collectionName);
   const maxId = collection.reduce((max, item) => (item.id > max ? item.id : max), 0);
   return maxId + 1;
 }
 
-function addCliente(cliente) {
-  const novo = { id: nextId('clientes'), ...cliente };
-  data.clientes = [novo, ...data.clientes];
-  saveDatabase();
-  return novo;
-}
-
-function updateCliente(id, updates) {
-  let atualizado;
-  data.clientes = data.clientes.map(cliente => {
-    if (cliente.id === id) {
-      atualizado = { ...cliente, ...updates, id };
-      return atualizado;
-    }
-    return cliente;
+async function addCliente(cliente) {
+  return db.transact(async (draft, markDirty) => {
+    const novoId = draft.clientes.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
+    const novo = { id: novoId, ...cliente };
+    draft.clientes = [novo, ...draft.clientes];
+    markDirty();
+    return novo;
   });
-  if (atualizado) {
-    saveDatabase();
-  }
-  return atualizado;
 }
 
-function addVeiculo(veiculo) {
-  const novo = { id: nextId('veiculos'), ...veiculo };
-  data.veiculos = [novo, ...data.veiculos];
-  saveDatabase();
-  return novo;
-}
-
-function updateVeiculo(id, updates) {
-  let atualizado;
-  data.veiculos = data.veiculos.map(veiculo => {
-    if (veiculo.id === id) {
-      atualizado = { ...veiculo, ...updates, id };
-      return atualizado;
+async function updateCliente(id, updates) {
+  return db.transact(async (draft, markDirty) => {
+    const index = draft.clientes.findIndex(cliente => cliente.id === id);
+    if (index === -1) {
+      return undefined;
     }
-    return veiculo;
+    const atualizado = { ...draft.clientes[index], ...updates, id };
+    draft.clientes[index] = atualizado;
+    markDirty();
+    return atualizado;
   });
-  if (atualizado) {
-    saveDatabase();
-  }
-  return atualizado;
 }
 
-function addPeca(peca) {
-  const novo = { id: nextId('pecas'), ...peca };
-  data.pecas = [novo, ...data.pecas];
-  saveDatabase();
-  return novo;
+async function addVeiculo(veiculo) {
+  return db.transact(async (draft, markDirty) => {
+    const novoId = draft.veiculos.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
+    const novo = { id: novoId, ...veiculo };
+    draft.veiculos = [novo, ...draft.veiculos];
+    markDirty();
+    return novo;
+  });
 }
 
-function updatePeca(id, updates) {
-  let atualizado;
-  data.pecas = data.pecas.map(peca => {
-    if (peca.id === id) {
-      atualizado = { ...peca, ...updates, id };
-      return atualizado;
+async function updateVeiculo(id, updates) {
+  return db.transact(async (draft, markDirty) => {
+    const index = draft.veiculos.findIndex(veiculo => veiculo.id === id);
+    if (index === -1) {
+      return undefined;
     }
-    return peca;
+    const atualizado = { ...draft.veiculos[index], ...updates, id };
+    draft.veiculos[index] = atualizado;
+    markDirty();
+    return atualizado;
   });
-  if (atualizado) {
-    saveDatabase();
-  }
-  return atualizado;
 }
 
-function addOrdemServico(ordem) {
-  const nova = { id: nextId('ordensServico'), servicos: [], pecas: [], ...ordem };
-  data.ordensServico = [nova, ...data.ordensServico];
-  saveDatabase();
-  return nova;
+async function addPeca(peca) {
+  return db.transact(async (draft, markDirty) => {
+    const novoId = draft.pecas.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
+    const nova = { id: novoId, ...peca };
+    draft.pecas = [nova, ...draft.pecas];
+    markDirty();
+    return nova;
+  });
 }
 
-function updateOrdemServico(id, updates) {
-  let atualizada;
-  data.ordensServico = data.ordensServico.map(ordem => {
-    if (ordem.id === id) {
-      atualizada = { ...ordem, ...updates, id };
-      return atualizada;
+async function updatePeca(id, updates) {
+  return db.transact(async (draft, markDirty) => {
+    const index = draft.pecas.findIndex(peca => peca.id === id);
+    if (index === -1) {
+      return undefined;
     }
-    return ordem;
+    const atualizada = { ...draft.pecas[index], ...updates, id };
+    draft.pecas[index] = atualizada;
+    markDirty();
+    return atualizada;
   });
-  if (atualizada) {
-    saveDatabase();
-  }
-  return atualizada;
+}
+
+async function addOrdemServico(ordem) {
+  return db.transact(async (draft, markDirty) => {
+    const novoId =
+      draft.ordensServico.reduce((max, item) => (item.id > max ? item.id : max), 0) + 1;
+    const nova = {
+      id: novoId,
+      servicos: [],
+      pecas: [],
+      ...ordem
+    };
+    draft.ordensServico = [nova, ...draft.ordensServico];
+    markDirty();
+    return nova;
+  });
+}
+
+async function updateOrdemServico(id, updates) {
+  return db.transact(async (draft, markDirty) => {
+    const index = draft.ordensServico.findIndex(ordem => ordem.id === id);
+    if (index === -1) {
+      return undefined;
+    }
+    const atualizada = { ...draft.ordensServico[index], ...updates, id };
+    draft.ordensServico[index] = atualizada;
+    markDirty();
+    return atualizada;
+  });
 }
 
 module.exports = {
@@ -229,7 +288,5 @@ module.exports = {
   updatePeca,
   addOrdemServico,
   updateOrdemServico,
-  nextId,
-  saveDatabase,
-  data
+  nextId
 };

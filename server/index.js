@@ -29,26 +29,32 @@ function sendJson(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
-function parseBody(req, res, callback) {
-  const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', () => {
-    if (chunks.length === 0) {
-      callback({});
-      return;
-    }
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      if (chunks.length === 0) {
+        resolve({});
+        return;
+      }
 
-    try {
-      const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-      callback(body);
-    } catch (error) {
-      sendJson(res, 400, { message: 'JSON inválido no corpo da requisição.' });
-    }
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+        resolve(body);
+      } catch (error) {
+        const err = new Error('JSON inválido no corpo da requisição.');
+        err.status = 400;
+        err.payload = { message: err.message };
+        reject(err);
+      }
+    });
+    req.on('error', reject);
   });
 }
 
-function mapVeiculo(veiculo) {
-  const cliente = getClientes().find(clienteAtual => clienteAtual.id === veiculo.clienteId);
+function mapVeiculo(veiculo, clientes) {
+  const cliente = clientes.find(clienteAtual => clienteAtual.id === veiculo.clienteId);
   return {
     ...veiculo,
     clienteNome: cliente ? cliente.nome : 'Cliente não encontrado'
@@ -62,7 +68,7 @@ function mapOrdem(ordem) {
   };
 }
 
-const server = http.createServer((req, res) => {
+async function handleRequest(req, res) {
   if (!req.url) {
     sendJson(res, 400, { message: 'Requisição inválida.' });
     return;
@@ -79,238 +85,258 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
-  try {
-    if (req.method === 'GET' && pathname === '/api/clientes') {
-      const clientes = [...getClientes()].sort((a, b) => b.id - a.id).map(cliente => ({
+  if (req.method === 'GET' && pathname === '/api/clientes') {
+    const clientes = (await getClientes())
+      .sort((a, b) => b.id - a.id)
+      .map(cliente => ({
         ...cliente,
         email: cliente.email || undefined,
         telefone: cliente.telefone || undefined
       }));
-      sendJson(res, 200, clientes);
+    sendJson(res, 200, clientes);
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/clientes') {
+    const { nome, email, telefone } = (await parseBody(req)) || {};
+    if (!nome || !nome.trim()) {
+      sendJson(res, 400, { message: 'Nome é obrigatório.' });
       return;
     }
 
-    if (req.method === 'POST' && pathname === '/api/clientes') {
-      parseBody(req, res, body => {
-        const { nome, email, telefone } = body || {};
-        if (!nome || !nome.trim()) {
-          sendJson(res, 400, { message: 'Nome é obrigatório.' });
-          return;
-        }
+    const novo = await addCliente({
+      nome: nome.trim(),
+      email: email?.trim() || undefined,
+      telefone: telefone?.trim() || undefined
+    });
+    sendJson(res, 201, novo);
+    return;
+  }
 
-        const novo = addCliente({
-          nome: nome.trim(),
-          email: email?.trim() || undefined,
-          telefone: telefone?.trim() || undefined
-        });
-        sendJson(res, 201, novo);
-      });
+  if (req.method === 'PUT' && /^\/api\/clientes\/\d+$/.test(pathname)) {
+    const id = Number(pathname.split('/').pop());
+    const { nome, email, telefone } = (await parseBody(req)) || {};
+    if (!nome || !nome.trim()) {
+      sendJson(res, 400, { message: 'Nome é obrigatório.' });
       return;
     }
-
-    if (req.method === 'PUT' && /^\/api\/clientes\/\d+$/.test(pathname)) {
-      const id = Number(pathname.split('/').pop());
-      parseBody(req, res, body => {
-        const { nome, email, telefone } = body || {};
-        if (!nome || !nome.trim()) {
-          sendJson(res, 400, { message: 'Nome é obrigatório.' });
-          return;
-        }
-        const atualizado = updateCliente(id, {
-          nome: nome.trim(),
-          email: email?.trim() || undefined,
-          telefone: telefone?.trim() || undefined
-        });
-        if (!atualizado) {
-          sendJson(res, 404, { message: 'Cliente não encontrado.' });
-          return;
-        }
-        sendJson(res, 200, atualizado);
-      });
+    const atualizado = await updateCliente(id, {
+      nome: nome.trim(),
+      email: email?.trim() || undefined,
+      telefone: telefone?.trim() || undefined
+    });
+    if (!atualizado) {
+      sendJson(res, 404, { message: 'Cliente não encontrado.' });
       return;
     }
+    sendJson(res, 200, atualizado);
+    return;
+  }
 
-    if (req.method === 'GET' && pathname === '/api/veiculos') {
-      const veiculos = [...getVeiculos()].sort((a, b) => b.id - a.id).map(mapVeiculo);
-      sendJson(res, 200, veiculos);
+  if (req.method === 'GET' && pathname === '/api/veiculos') {
+    const [veiculos, clientes] = await Promise.all([getVeiculos(), getClientes()]);
+    const resposta = veiculos
+      .sort((a, b) => b.id - a.id)
+      .map(veiculo => mapVeiculo(veiculo, clientes));
+    sendJson(res, 200, resposta);
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/veiculos') {
+    const { placa, marca, modelo, ano, clienteId } = (await parseBody(req)) || {};
+    if (!placa || !marca || !modelo || !ano || !clienteId) {
+      sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
       return;
     }
-
-    if (req.method === 'POST' && pathname === '/api/veiculos') {
-      parseBody(req, res, body => {
-        const { placa, marca, modelo, ano, clienteId } = body || {};
-        if (!placa || !marca || !modelo || !ano || !clienteId) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
-          return;
-        }
-        const jaExiste = getVeiculos().some(v => v.placa.toLowerCase() === placa.trim().toLowerCase());
-        if (jaExiste) {
-          sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
-          return;
-        }
-        const novo = addVeiculo({
-          placa: placa.trim(),
-          marca: marca.trim(),
-          modelo: modelo.trim(),
-          ano: ano.trim(),
-          clienteId: Number(clienteId)
-        });
-        sendJson(res, 201, mapVeiculo(novo));
-      });
+    const placaNormalizada = placa.trim().toLowerCase();
+    const veiculos = await getVeiculos();
+    const jaExiste = veiculos.some(v => v.placa.toLowerCase() === placaNormalizada);
+    if (jaExiste) {
+      sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
       return;
     }
+    const novo = await addVeiculo({
+      placa: placa.trim(),
+      marca: marca.trim(),
+      modelo: modelo.trim(),
+      ano: ano.trim(),
+      clienteId: Number(clienteId)
+    });
+    const clientes = await getClientes();
+    sendJson(res, 201, mapVeiculo(novo, clientes));
+    return;
+  }
 
-    if (req.method === 'PUT' && /^\/api\/veiculos\/\d+$/.test(pathname)) {
-      const id = Number(pathname.split('/').pop());
-      parseBody(req, res, body => {
-        const { placa, marca, modelo, ano, clienteId } = body || {};
-        if (!placa || !marca || !modelo || !ano || !clienteId) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
-          return;
-        }
-        const outroVeiculo = getVeiculos().find(v => v.placa.toLowerCase() === placa.trim().toLowerCase() && v.id !== id);
-        if (outroVeiculo) {
-          sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
-          return;
-        }
-        const atualizado = updateVeiculo(id, {
-          placa: placa.trim(),
-          marca: marca.trim(),
-          modelo: modelo.trim(),
-          ano: ano.trim(),
-          clienteId: Number(clienteId)
-        });
-        if (!atualizado) {
-          sendJson(res, 404, { message: 'Veículo não encontrado.' });
-          return;
-        }
-        sendJson(res, 200, mapVeiculo(atualizado));
-      });
+  if (req.method === 'PUT' && /^\/api\/veiculos\/\d+$/.test(pathname)) {
+    const id = Number(pathname.split('/').pop());
+    const { placa, marca, modelo, ano, clienteId } = (await parseBody(req)) || {};
+    if (!placa || !marca || !modelo || !ano || !clienteId) {
+      sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
       return;
     }
-
-    if (req.method === 'GET' && pathname === '/api/pecas') {
-      const pecas = [...getPecas()].sort((a, b) => b.id - a.id);
-      sendJson(res, 200, pecas);
+    const placaNormalizada = placa.trim().toLowerCase();
+    const veiculos = await getVeiculos();
+    const outroVeiculo = veiculos.find(
+      v => v.placa.toLowerCase() === placaNormalizada && v.id !== id
+    );
+    if (outroVeiculo) {
+      sendJson(res, 409, { message: 'Já existe um veículo com esta placa.' });
       return;
     }
-
-    if (req.method === 'POST' && pathname === '/api/pecas') {
-      parseBody(req, res, body => {
-        const { nome, codigo, estoque, preco } = body || {};
-        if (!nome || !codigo) {
-          sendJson(res, 400, { message: 'Nome e código são obrigatórios.' });
-          return;
-        }
-        const novo = addPeca({
-          nome: nome.trim(),
-          codigo: codigo.trim(),
-          estoque: Number.isFinite(Number(estoque)) ? Number(estoque) : 0,
-          preco: Number.isFinite(Number(preco)) ? Number(preco) : 0
-        });
-        sendJson(res, 201, novo);
-      });
+    const atualizado = await updateVeiculo(id, {
+      placa: placa.trim(),
+      marca: marca.trim(),
+      modelo: modelo.trim(),
+      ano: ano.trim(),
+      clienteId: Number(clienteId)
+    });
+    if (!atualizado) {
+      sendJson(res, 404, { message: 'Veículo não encontrado.' });
       return;
     }
+    const clientes = await getClientes();
+    sendJson(res, 200, mapVeiculo(atualizado, clientes));
+    return;
+  }
 
-    if (req.method === 'PUT' && /^\/api\/pecas\/\d+$/.test(pathname)) {
-      const id = Number(pathname.split('/').pop());
-      parseBody(req, res, body => {
-        const { nome, codigo, estoque, preco } = body || {};
-        if (!nome || !codigo) {
-          sendJson(res, 400, { message: 'Nome e código são obrigatórios.' });
-          return;
-        }
-        const atualizada = updatePeca(id, {
-          nome: nome.trim(),
-          codigo: codigo.trim(),
-          estoque: Number.isFinite(Number(estoque)) ? Number(estoque) : 0,
-          preco: Number.isFinite(Number(preco)) ? Number(preco) : 0
-        });
-        if (!atualizada) {
-          sendJson(res, 404, { message: 'Peça não encontrada.' });
-          return;
-        }
-        sendJson(res, 200, atualizada);
-      });
+  if (req.method === 'GET' && pathname === '/api/pecas') {
+    const pecas = (await getPecas()).sort((a, b) => b.id - a.id);
+    sendJson(res, 200, pecas);
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/pecas') {
+    const { nome, codigo, estoque, preco } = (await parseBody(req)) || {};
+    if (!nome || !codigo) {
+      sendJson(res, 400, { message: 'Nome e código são obrigatórios.' });
       return;
     }
+    const nova = await addPeca({
+      nome: nome.trim(),
+      codigo: codigo.trim(),
+      estoque: Number.isFinite(Number(estoque)) ? Number(estoque) : 0,
+      preco: Number.isFinite(Number(preco)) ? Number(preco) : 0
+    });
+    sendJson(res, 201, nova);
+    return;
+  }
 
-    if (req.method === 'GET' && pathname === '/api/servicos') {
-      const servicos = [...getServicos()].sort((a, b) => b.id - a.id);
-      sendJson(res, 200, servicos);
+  if (req.method === 'PUT' && /^\/api\/pecas\/\d+$/.test(pathname)) {
+    const id = Number(pathname.split('/').pop());
+    const { nome, codigo, estoque, preco } = (await parseBody(req)) || {};
+    if (!nome || !codigo) {
+      sendJson(res, 400, { message: 'Nome e código são obrigatórios.' });
       return;
     }
-
-    if (req.method === 'GET' && pathname === '/api/ordens-servico') {
-      const ordens = [...getOrdensServico()].sort((a, b) => b.id - a.id).map(mapOrdem);
-      sendJson(res, 200, ordens);
+    const atualizada = await updatePeca(id, {
+      nome: nome.trim(),
+      codigo: codigo.trim(),
+      estoque: Number.isFinite(Number(estoque)) ? Number(estoque) : 0,
+      preco: Number.isFinite(Number(preco)) ? Number(preco) : 0
+    });
+    if (!atualizada) {
+      sendJson(res, 404, { message: 'Peça não encontrada.' });
       return;
     }
+    sendJson(res, 200, atualizada);
+    return;
+  }
 
-    if (req.method === 'GET' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
-      const id = Number(pathname.split('/').pop());
-      const ordem = getOrdensServico().find(item => item.id === id);
-      if (!ordem) {
-        sendJson(res, 404, { message: 'Ordem de serviço não encontrada.' });
-        return;
-      }
-      sendJson(res, 200, mapOrdem(ordem));
+  if (req.method === 'GET' && pathname === '/api/servicos') {
+    const servicos = (await getServicos()).sort((a, b) => b.id - a.id);
+    sendJson(res, 200, servicos);
+    return;
+  }
+
+  if (req.method === 'GET' && pathname === '/api/ordens-servico') {
+    const ordens = (await getOrdensServico()).sort((a, b) => b.id - a.id).map(mapOrdem);
+    sendJson(res, 200, ordens);
+    return;
+  }
+
+  if (req.method === 'GET' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
+    const id = Number(pathname.split('/').pop());
+    const ordens = await getOrdensServico();
+    const ordem = ordens.find(item => item.id === id);
+    if (!ordem) {
+      sendJson(res, 404, { message: 'Ordem de serviço não encontrada.' });
       return;
     }
+    sendJson(res, 200, mapOrdem(ordem));
+    return;
+  }
 
-    if (req.method === 'POST' && pathname === '/api/ordens-servico') {
-      parseBody(req, res, body => {
-        const { clienteId, veiculoId, dataEntrada, status, servicos = [], pecas = [], observacoes } = body || {};
-        if (!clienteId || !veiculoId || !dataEntrada || !status) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
-          return;
-        }
-        const nova = addOrdemServico({
-          clienteId: Number(clienteId),
-          veiculoId: Number(veiculoId),
-          dataEntrada,
-          status,
-          servicos: Array.isArray(servicos) ? servicos : [],
-          pecas: Array.isArray(pecas) ? pecas : [],
-          observacoes: observacoes?.trim() || undefined
-        });
-        sendJson(res, 201, mapOrdem(nova));
-      });
+  if (req.method === 'POST' && pathname === '/api/ordens-servico') {
+    const {
+      clienteId,
+      veiculoId,
+      dataEntrada,
+      status,
+      servicos = [],
+      pecas = [],
+      observacoes
+    } = (await parseBody(req)) || {};
+    if (!clienteId || !veiculoId || !dataEntrada || !status) {
+      sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
       return;
     }
+    const nova = await addOrdemServico({
+      clienteId: Number(clienteId),
+      veiculoId: Number(veiculoId),
+      dataEntrada,
+      status,
+      servicos: Array.isArray(servicos) ? servicos : [],
+      pecas: Array.isArray(pecas) ? pecas : [],
+      observacoes: observacoes?.trim() || undefined
+    });
+    sendJson(res, 201, mapOrdem(nova));
+    return;
+  }
 
-    if (req.method === 'PUT' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
-      const id = Number(pathname.split('/').pop());
-      parseBody(req, res, body => {
-        const { clienteId, veiculoId, dataEntrada, status, servicos = [], pecas = [], observacoes } = body || {};
-        if (!clienteId || !veiculoId || !dataEntrada || !status) {
-          sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
-          return;
-        }
-        const atualizada = updateOrdemServico(id, {
-          clienteId: Number(clienteId),
-          veiculoId: Number(veiculoId),
-          dataEntrada,
-          status,
-          servicos: Array.isArray(servicos) ? servicos : [],
-          pecas: Array.isArray(pecas) ? pecas : [],
-          observacoes: observacoes?.trim() || undefined
-        });
-        if (!atualizada) {
-          sendJson(res, 404, { message: 'Ordem de serviço não encontrada.' });
-          return;
-        }
-        sendJson(res, 200, mapOrdem(atualizada));
-      });
+  if (req.method === 'PUT' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
+    const id = Number(pathname.split('/').pop());
+    const {
+      clienteId,
+      veiculoId,
+      dataEntrada,
+      status,
+      servicos = [],
+      pecas = [],
+      observacoes
+    } = (await parseBody(req)) || {};
+    if (!clienteId || !veiculoId || !dataEntrada || !status) {
+      sendJson(res, 400, { message: 'Dados obrigatórios ausentes.' });
       return;
     }
+    const atualizada = await updateOrdemServico(id, {
+      clienteId: Number(clienteId),
+      veiculoId: Number(veiculoId),
+      dataEntrada,
+      status,
+      servicos: Array.isArray(servicos) ? servicos : [],
+      pecas: Array.isArray(pecas) ? pecas : [],
+      observacoes: observacoes?.trim() || undefined
+    });
+    if (!atualizada) {
+      sendJson(res, 404, { message: 'Ordem de serviço não encontrada.' });
+      return;
+    }
+    sendJson(res, 200, mapOrdem(atualizada));
+    return;
+  }
 
-    sendJson(res, 404, { message: 'Rota não encontrada.' });
-  } catch (error) {
+  sendJson(res, 404, { message: 'Rota não encontrada.' });
+}
+
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch(error => {
+    if (error && error.status) {
+      sendJson(res, error.status, error.payload || { message: error.message });
+      return;
+    }
     console.error('Erro inesperado:', error);
     sendJson(res, 500, { message: 'Erro interno do servidor.' });
-  }
+  });
 });
 
 server.listen(PORT, () => {
