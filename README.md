@@ -22,7 +22,7 @@ This project now possui um backend Node.js simples responsável por persistir os
 
    Acesse `http://localhost:4200/` no navegador. As alterações nos arquivos front-end recarregam automaticamente a página.
 
-> **Evite erros no console**: Se o frontend for aberto sem a API rodando, as chamadas HTTP resultarão em mensagens de erro. O serviço de dados agora entra automaticamente em um **modo offline** e exibe informações locais somente leitura, mas para trabalhar com dados reais (e impedir as mensagens de erro) mantenha `npm run server` ativo em paralelo ao `ng serve`.
+> **Evite erros no console**: Se o frontend for aberto sem a API rodando, ele detecta automaticamente a indisponibilidade do servidor, entra em **modo offline** e utiliza os dados locais sem disparar erros de `ERR_CONNECTION_REFUSED`. Para trabalhar com dados persistidos mantenha `npm run server` ativo em paralelo ao `ng serve`.
 
 ### Credenciais padrão
 

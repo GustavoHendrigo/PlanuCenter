@@ -93,6 +93,11 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
 
   try {
+    if (req.method === 'GET' && pathname === '/api/status') {
+      sendJson(res, 200, { status: 'ok' });
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/clientes') {
       const clientes = [...getClientes()].sort((a, b) => b.id - a.id).map(cliente => ({
         ...cliente,

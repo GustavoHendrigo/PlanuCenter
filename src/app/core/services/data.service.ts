@@ -89,6 +89,8 @@ export class DataService {
   private readonly apiUrl = 'http://localhost:3000/api';
   private readonly offlineState: OfflineDatabase = deepClone(OFFLINE_DATA);
   private notificouFalhaApi = false;
+  private apiDisponivel = true;
+  private verificandoApi?: Promise<boolean>;
 
   readonly clientes = signal<Cliente[]>([]);
   readonly veiculos = signal<Veiculo[]>([]);
@@ -116,6 +118,9 @@ export class DataService {
       this.reaplicarClientesOffline();
       return;
     }
+    if (!(await this.garantirApiDisponivel('clientes'))) {
+      return;
+    }
     try {
       const clientes = await firstValueFrom(this.http.get<Cliente[]>(`${this.apiUrl}/clientes`));
       this.atualizarClientes(clientes);
@@ -127,6 +132,10 @@ export class DataService {
 
   async criarCliente(dados: Omit<Cliente, 'id'>) {
     if (this.modoOffline()) {
+      return this.criarClienteOffline(dados);
+    }
+
+    if (!(await this.garantirApiDisponivel('clientes'))) {
       return this.criarClienteOffline(dados);
     }
 
@@ -147,6 +156,10 @@ export class DataService {
       return this.atualizarClienteOffline(id, dados);
     }
 
+    if (!(await this.garantirApiDisponivel('clientes'))) {
+      return this.atualizarClienteOffline(id, dados);
+    }
+
     try {
       const atualizado = await firstValueFrom(this.http.put<Cliente>(`${this.apiUrl}/clientes/${id}`, dados));
       this.clientes.update(lista => lista.map(cliente => (cliente.id === id ? atualizado : cliente)));
@@ -162,6 +175,11 @@ export class DataService {
 
   async removerCliente(id: number) {
     if (this.modoOffline()) {
+      this.removerClienteOffline(id);
+      return;
+    }
+
+    if (!(await this.garantirApiDisponivel('clientes'))) {
       this.removerClienteOffline(id);
       return;
     }
@@ -186,6 +204,9 @@ export class DataService {
       this.reaplicarVeiculosOffline();
       return;
     }
+    if (!(await this.garantirApiDisponivel('veículos'))) {
+      return;
+    }
     try {
       const veiculos = await firstValueFrom(this.http.get<Veiculo[]>(`${this.apiUrl}/veiculos`));
       this.atualizarVeiculos(veiculos);
@@ -197,6 +218,10 @@ export class DataService {
 
   async criarVeiculo(dados: Omit<Veiculo, 'id' | 'clienteNome'>) {
     if (this.modoOffline()) {
+      return this.criarVeiculoOffline(dados);
+    }
+
+    if (!(await this.garantirApiDisponivel('veículos'))) {
       return this.criarVeiculoOffline(dados);
     }
 
@@ -217,6 +242,10 @@ export class DataService {
       return this.atualizarVeiculoOffline(id, dados);
     }
 
+    if (!(await this.garantirApiDisponivel('veículos'))) {
+      return this.atualizarVeiculoOffline(id, dados);
+    }
+
     try {
       const atualizado = await firstValueFrom(this.http.put<Veiculo>(`${this.apiUrl}/veiculos/${id}`, dados));
       this.veiculos.update(lista => lista.map(veiculo => (veiculo.id === id ? atualizado : veiculo)));
@@ -231,6 +260,11 @@ export class DataService {
 
   async removerVeiculo(id: number) {
     if (this.modoOffline()) {
+      this.removerVeiculoOffline(id);
+      return;
+    }
+
+    if (!(await this.garantirApiDisponivel('veículos'))) {
       this.removerVeiculoOffline(id);
       return;
     }
@@ -253,6 +287,9 @@ export class DataService {
       this.reaplicarPecasOffline();
       return;
     }
+    if (!(await this.garantirApiDisponivel('peças'))) {
+      return;
+    }
     try {
       const pecas = await firstValueFrom(this.http.get<Peca[]>(`${this.apiUrl}/pecas`));
       this.atualizarPecas(pecas);
@@ -264,6 +301,10 @@ export class DataService {
 
   async criarPeca(dados: Omit<Peca, 'id'>) {
     if (this.modoOffline()) {
+      return this.criarPecaOffline(dados);
+    }
+
+    if (!(await this.garantirApiDisponivel('peças'))) {
       return this.criarPecaOffline(dados);
     }
 
@@ -284,6 +325,10 @@ export class DataService {
       return this.atualizarPecaOffline(id, dados);
     }
 
+    if (!(await this.garantirApiDisponivel('peças'))) {
+      return this.atualizarPecaOffline(id, dados);
+    }
+
     try {
       const atualizada = await firstValueFrom(this.http.put<Peca>(`${this.apiUrl}/pecas/${id}`, dados));
       this.pecas.update(lista => lista.map(peca => (peca.id === id ? atualizada : peca)));
@@ -298,6 +343,11 @@ export class DataService {
 
   async removerPeca(id: number) {
     if (this.modoOffline()) {
+      this.removerPecaOffline(id);
+      return;
+    }
+
+    if (!(await this.garantirApiDisponivel('peças'))) {
       this.removerPecaOffline(id);
       return;
     }
@@ -325,6 +375,9 @@ export class DataService {
       this.reaplicarServicosOffline();
       return;
     }
+    if (!(await this.garantirApiDisponivel('serviços'))) {
+      return;
+    }
     try {
       const servicos = await firstValueFrom(this.http.get<Servico[]>(`${this.apiUrl}/servicos`));
       this.atualizarServicos(servicos);
@@ -339,6 +392,9 @@ export class DataService {
       this.reaplicarOrdensOffline();
       return;
     }
+    if (!(await this.garantirApiDisponivel('ordens de serviço'))) {
+      return;
+    }
     try {
       const ordens = await firstValueFrom(this.http.get<OrdemServico[]>(`${this.apiUrl}/ordens-servico`));
       this.atualizarOrdens(ordens);
@@ -350,6 +406,10 @@ export class DataService {
 
   async criarOrdemServico(dados: Omit<OrdemServico, 'id'>) {
     if (this.modoOffline()) {
+      return this.criarOrdemOffline(dados);
+    }
+
+    if (!(await this.garantirApiDisponivel('ordens de serviço'))) {
       return this.criarOrdemOffline(dados);
     }
 
@@ -367,6 +427,10 @@ export class DataService {
 
   async atualizarOrdemServico(id: number, dados: Omit<OrdemServico, 'id'>) {
     if (this.modoOffline()) {
+      return this.atualizarOrdemOffline(id, dados);
+    }
+
+    if (!(await this.garantirApiDisponivel('ordens de serviço'))) {
       return this.atualizarOrdemOffline(id, dados);
     }
 
@@ -388,6 +452,11 @@ export class DataService {
       return;
     }
 
+    if (!(await this.garantirApiDisponivel('ordens de serviço'))) {
+      this.removerOrdemOffline(id);
+      return;
+    }
+
     try {
       await firstValueFrom(this.http.delete<void>(`${this.apiUrl}/ordens-servico/${id}`));
       this.ordensServico.update(lista => lista.filter(ordem => ordem.id !== id));
@@ -401,6 +470,36 @@ export class DataService {
 
   getOrdemServicoById(id: number): OrdemServico | undefined {
     return this.ordensServico().find(os => os.id === id);
+  }
+
+  private async garantirApiDisponivel(contexto: string) {
+    if (this.modoOffline() || !this.apiDisponivel) {
+      return false;
+    }
+
+    if (!this.verificandoApi) {
+      this.verificandoApi = this.pingApi().then(disponivel => {
+        this.apiDisponivel = disponivel;
+        if (!disponivel) {
+          this.registrarFalhaApi(contexto);
+          this.ativarModoOffline();
+        }
+        return disponivel;
+      }).finally(() => {
+        this.verificandoApi = undefined;
+      });
+    }
+
+    return this.verificandoApi;
+  }
+
+  private async pingApi(): Promise<boolean> {
+    try {
+      const resposta = await fetch(`${this.apiUrl}/status`, { method: 'GET', cache: 'no-store' });
+      return resposta.ok;
+    } catch {
+      return false;
+    }
   }
 
   private registrarFalhaApi(contexto: string) {

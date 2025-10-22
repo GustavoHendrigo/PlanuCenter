@@ -40,6 +40,8 @@ export class AuthService {
   private http = inject(HttpClient);
   private readonly apiUrl = 'http://localhost:3000/api';
   private readonly storageKey = 'planu-center/auth';
+  private apiDisponivel = true;
+  private verificandoApi?: Promise<boolean>;
 
   private readonly usuarioInterno = signal<Usuario | null>(this.restaurarSessao());
   readonly usuarioAtual = computed(() => this.usuarioInterno());
@@ -47,6 +49,10 @@ export class AuthService {
 
   async login(email: string, senha: string) {
     const payload: LoginPayload = { email: email.trim().toLowerCase(), senha };
+
+    if (!(await this.verificarApiDisponivel())) {
+      return this.autenticarModoOffline(payload);
+    }
 
     try {
       const resposta = await firstValueFrom(
@@ -59,18 +65,8 @@ export class AuthService {
       if (!deveTentarOffline) {
         throw error;
       }
-
-      const usuarioOffline = this.autenticarOffline(payload.email, payload.senha);
-      if (!usuarioOffline) {
-        throw error;
-      }
-
-      const respostaOffline: LoginResponse = {
-        token: this.gerarTokenOffline(usuarioOffline),
-        usuario: this.mapearUsuario(usuarioOffline)
-      };
-      this.persistirSessao(respostaOffline, true);
-      return respostaOffline.usuario;
+      this.apiDisponivel = false;
+      return this.autenticarModoOffline(payload);
     }
   }
 
@@ -97,6 +93,48 @@ export class AuthService {
         );
       }
     }
+  }
+
+  private async verificarApiDisponivel(): Promise<boolean> {
+    if (!this.apiDisponivel) {
+      return false;
+    }
+
+    if (!this.verificandoApi) {
+      this.verificandoApi = fetch(`${this.apiUrl}/status`, {
+        method: 'GET',
+        cache: 'no-store'
+      })
+        .then(resposta => resposta.ok)
+        .catch(() => false)
+        .finally(() => {
+          this.verificandoApi = undefined;
+        });
+    }
+
+    const disponivel = await this.verificandoApi;
+    if (!disponivel) {
+      this.apiDisponivel = false;
+    }
+    return disponivel;
+  }
+
+  private autenticarModoOffline(payload: LoginPayload) {
+    const usuarioOffline = this.autenticarOffline(payload.email, payload.senha);
+    if (!usuarioOffline) {
+      const erro = new Error('Credenciais inválidas.');
+      (erro as any).status = 401;
+      throw erro;
+    }
+
+    console.warn('API de autenticação indisponível. Validando credenciais localmente.');
+
+    const respostaOffline: LoginResponse = {
+      token: this.gerarTokenOffline(usuarioOffline),
+      usuario: this.mapearUsuario(usuarioOffline)
+    };
+    this.persistirSessao(respostaOffline, true);
+    return respostaOffline.usuario;
   }
 
   private mapearUsuario(usuario: UsuarioAutenticavel): Usuario {
