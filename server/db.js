@@ -122,8 +122,11 @@ function getOrdensServico() {
 }
 
 function nextId(collectionName) {
-  const collection = data[collectionName];
-  const maxId = collection.reduce((max, item) => (item.id > max ? item.id : max), 0);
+  const collection = Array.isArray(data[collectionName]) ? data[collectionName] : [];
+  const maxId = collection.reduce((max, item) => {
+    const itemId = typeof item.id === 'number' ? item.id : Number(item.id);
+    return Number.isFinite(itemId) && itemId > max ? itemId : max;
+  }, 0);
   return maxId + 1;
 }
 
