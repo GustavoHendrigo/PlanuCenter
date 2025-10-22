@@ -1,5 +1,6 @@
 const http = require('http');
 const { URL } = require('url');
+const crypto = require('crypto');
 const {
   getClientes,
   addCliente,
@@ -13,20 +14,30 @@ const {
   getServicos,
   getOrdensServico,
   addOrdemServico,
-  updateOrdemServico
+  updateOrdemServico,
+  deleteCliente,
+  deleteVeiculo,
+  deletePeca,
+  deleteOrdemServico,
+  getUsuarios
 } = require('./db');
 
 const PORT = process.env.PORT || 3000;
 
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 }
 
 function sendJson(res, status, data) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
+}
+
+function sendNoContent(res) {
+  res.writeHead(204);
+  res.end();
 }
 
 function parseBody(req, res, callback) {
@@ -80,6 +91,40 @@ const server = http.createServer((req, res) => {
   const pathname = url.pathname;
 
   try {
+    if (req.method === 'POST' && pathname === '/api/auth/login') {
+      parseBody(req, res, body => {
+        const { email, password } = body || {};
+        if (!email || !password) {
+          sendJson(res, 400, { message: 'E-mail e senha são obrigatórios.' });
+          return;
+        }
+
+        const usuario = getUsuarios().find(user => user.email.toLowerCase() === String(email).trim().toLowerCase());
+        if (!usuario) {
+          sendJson(res, 401, { message: 'Credenciais inválidas.' });
+          return;
+        }
+
+        const senhaHash = crypto.createHash('sha256').update(String(password)).digest('hex');
+        if (senhaHash !== usuario.senhaHash) {
+          sendJson(res, 401, { message: 'Credenciais inválidas.' });
+          return;
+        }
+
+        const token = crypto.randomUUID();
+        sendJson(res, 200, {
+          token,
+          usuario: {
+            id: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email,
+            perfil: usuario.perfil
+          }
+        });
+      });
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/clientes') {
       const clientes = [...getClientes()].sort((a, b) => b.id - a.id).map(cliente => ({
         ...cliente,
@@ -127,6 +172,17 @@ const server = http.createServer((req, res) => {
         }
         sendJson(res, 200, atualizado);
       });
+      return;
+    }
+
+    if (req.method === 'DELETE' && /^\/api\/clientes\/\d+$/.test(pathname)) {
+      const id = Number(pathname.split('/').pop());
+      const removido = deleteCliente(id);
+      if (!removido) {
+        sendJson(res, 404, { message: 'Cliente não encontrado.' });
+        return;
+      }
+      sendNoContent(res);
       return;
     }
 
@@ -189,6 +245,17 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    if (req.method === 'DELETE' && /^\/api\/veiculos\/\d+$/.test(pathname)) {
+      const id = Number(pathname.split('/').pop());
+      const removido = deleteVeiculo(id);
+      if (!removido) {
+        sendJson(res, 404, { message: 'Veículo não encontrado.' });
+        return;
+      }
+      sendNoContent(res);
+      return;
+    }
+
     if (req.method === 'GET' && pathname === '/api/pecas') {
       const pecas = [...getPecas()].sort((a, b) => b.id - a.id);
       sendJson(res, 200, pecas);
@@ -233,6 +300,17 @@ const server = http.createServer((req, res) => {
         }
         sendJson(res, 200, atualizada);
       });
+      return;
+    }
+
+    if (req.method === 'DELETE' && /^\/api\/pecas\/\d+$/.test(pathname)) {
+      const id = Number(pathname.split('/').pop());
+      const removida = deletePeca(id);
+      if (!removida) {
+        sendJson(res, 404, { message: 'Peça não encontrada.' });
+        return;
+      }
+      sendNoContent(res);
       return;
     }
 
@@ -303,6 +381,17 @@ const server = http.createServer((req, res) => {
         }
         sendJson(res, 200, mapOrdem(atualizada));
       });
+      return;
+    }
+
+    if (req.method === 'DELETE' && /^\/api\/ordens-servico\/\d+$/.test(pathname)) {
+      const id = Number(pathname.split('/').pop());
+      const removida = deleteOrdemServico(id);
+      if (!removida) {
+        sendJson(res, 404, { message: 'Ordem de serviço não encontrada.' });
+        return;
+      }
+      sendNoContent(res);
       return;
     }
 

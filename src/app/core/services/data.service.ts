@@ -39,6 +39,16 @@ export class DataService {
     }
   }
 
+  async excluirCliente(id: number) {
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiUrl}/clientes/${id}`));
+      await Promise.all([this.carregarClientes(), this.carregarVeiculos(), this.carregarOrdensServico()]);
+    } catch (error) {
+      console.error('Erro ao excluir cliente', error);
+      throw error;
+    }
+  }
+
   async criarCliente(dados: Omit<Cliente, 'id'>) {
     const novo = await firstValueFrom(this.http.post<Cliente>(`${this.apiUrl}/clientes`, dados));
     this.clientes.update(lista => [novo, ...lista.filter(cliente => cliente.id !== novo.id)]);
@@ -61,6 +71,16 @@ export class DataService {
     }
   }
 
+  async excluirVeiculo(id: number) {
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiUrl}/veiculos/${id}`));
+      await Promise.all([this.carregarVeiculos(), this.carregarOrdensServico()]);
+    } catch (error) {
+      console.error('Erro ao excluir veículo', error);
+      throw error;
+    }
+  }
+
   async criarVeiculo(dados: Omit<Veiculo, 'id' | 'clienteNome'>) {
     const novo = await firstValueFrom(this.http.post<Veiculo>(`${this.apiUrl}/veiculos`, dados));
     this.veiculos.update(lista => [novo, ...lista.filter(veiculo => veiculo.id !== novo.id)]);
@@ -79,6 +99,16 @@ export class DataService {
       this.pecas.set(pecas);
     } catch (error) {
       console.error('Erro ao carregar peças', error);
+    }
+  }
+
+  async excluirPeca(id: number) {
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiUrl}/pecas/${id}`));
+      await Promise.all([this.carregarPecas(), this.carregarOrdensServico()]);
+    } catch (error) {
+      console.error('Erro ao excluir peça', error);
+      throw error;
     }
   }
 
@@ -109,6 +139,16 @@ export class DataService {
       this.ordensServico.set(ordens);
     } catch (error) {
       console.error('Erro ao carregar ordens de serviço', error);
+    }
+  }
+
+  async excluirOrdemServico(id: number) {
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiUrl}/ordens-servico/${id}`));
+      await this.carregarOrdensServico();
+    } catch (error) {
+      console.error('Erro ao excluir ordem de serviço', error);
+      throw error;
     }
   }
 

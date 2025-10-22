@@ -23,19 +23,21 @@
         </div>
 
         <div class="relative">
-          <button
-            class="flex items-center rounded-full bg-white/10 pl-2 pr-3 text-left text-sm text-slate-100 transition hover:bg-white/20"
-            (click)="toggleProfileMenu()"
-          >
-            <div class="mr-2 h-9 w-9 rounded-full bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 text-white flex items-center justify-center font-semibold shadow-lg shadow-sky-500/40">
-              A
-            </div>
-            <div class="hidden sm:block leading-tight">
-              <p class="font-semibold text-slate-100">Admin</p>
-              <p class="text-xs text-slate-300/80">Administrador</p>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg>
-          </button>
+          @if (usuarioAtual(); as usuario) {
+            <button
+              class="flex items-center rounded-full bg-white/10 pl-2 pr-3 text-left text-sm text-slate-100 transition hover:bg-white/20"
+              (click)="toggleProfileMenu()"
+            >
+              <div class="mr-2 h-9 w-9 rounded-full bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 text-white flex items-center justify-center font-semibold shadow-lg shadow-sky-500/40">
+                {{ avatarInicial() }}
+              </div>
+              <div class="hidden sm:block leading-tight">
+                <p class="font-semibold text-slate-100">{{ usuario.nome }}</p>
+                <p class="text-xs text-slate-300/80">{{ perfilUsuario() || 'Usuário' }}</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="ml-2 h-4 w-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" /></svg>
+            </button>
+          }
 
           @if (isProfileMenuOpen()) {
             <div class="absolute right-0 mt-2 w-48 rounded-2xl border border-white/10 bg-slate-950/90 p-2 text-sm shadow-xl shadow-slate-950/60 backdrop-blur">

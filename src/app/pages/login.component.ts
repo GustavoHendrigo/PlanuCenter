@@ -1,6 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { AuthService } from '../core/services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -48,12 +51,16 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
             }
           </div>
 
+          @if (erro()) {
+            <p class="text-sm text-rose-300">{{ erro() }}</p>
+          }
+
           <button
             type="submit"
             class="w-full rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/40 transition hover:from-sky-400 hover:via-blue-400 hover:to-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-            [disabled]="form.invalid"
+            [disabled]="form.invalid || carregando()"
           >
-            Entrar
+            {{ carregando() ? 'Entrando...' : 'Entrar' }}
           </button>
         </form>
       </div>
@@ -62,11 +69,22 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 })
 export class LoginComponent {
   private fb = new FormBuilder();
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
+  erro = signal<string | null>(null);
+  carregando = signal(false);
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
   });
+
+  constructor() {
+    if (this.authService.autenticado()) {
+      void this.router.navigate(['/inicio']);
+    }
+  }
 
   onSubmit() {
     this.form.markAllAsTouched();
@@ -74,7 +92,27 @@ export class LoginComponent {
       return;
     }
 
-    // Futuramente, integrar com serviço de autenticação.
-    console.log('Login realizado', this.form.value);
+    const { email, password } = this.form.value;
+    if (!email || !password) {
+      return;
+    }
+
+    this.carregando.set(true);
+    this.erro.set(null);
+
+    this.authService
+      .login(email, password)
+      .then(() => {
+        this.carregando.set(false);
+        void this.router.navigate(['/inicio']);
+      })
+      .catch(error => {
+        this.carregando.set(false);
+        if (error instanceof HttpErrorResponse && error.status === 401) {
+          this.erro.set('E-mail ou senha inválidos.');
+        } else {
+          this.erro.set('Não foi possível realizar o login. Tente novamente.');
+        }
+      });
   }
 }

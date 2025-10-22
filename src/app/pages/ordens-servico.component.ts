@@ -1,12 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { DataService } from '../core/services/data.service';
 
 @Component({
   selector: 'app-ordens-servico',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <section class="rounded-3xl border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-slate-950/30 backdrop-blur sm:p-8">
       <div class="flex flex-col gap-6">
@@ -35,7 +36,21 @@ import { DataService } from '../core/services/data.service';
         </div>
 
         @if (modoVisualizacao() === 'lista') {
-          <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+          <div class="space-y-4">
+            <div class="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex-1">
+                <label class="block text-xs font-semibold uppercase tracking-[0.35em] text-slate-300/80">Pesquisar</label>
+                <input
+                  type="search"
+                  class="mt-2 w-full rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-400 shadow-inner shadow-slate-950/40 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40"
+                  placeholder="Buscar por número da O.S., placa, cliente ou status"
+                  [ngModel]="termoBusca()"
+                  (ngModelChange)="termoBusca.set($event)"
+                />
+              </div>
+            </div>
+
+            <div class="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
             <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-white/10 text-left text-sm text-slate-100">
                 <thead class="bg-white/5 text-xs uppercase tracking-wider text-slate-300">
@@ -48,7 +63,8 @@ import { DataService } from '../core/services/data.service';
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5 text-sm">
-                  @for (os of ordensServico(); track os.id) {
+                  @if (ordensFiltradas().length) {
+                    @for (os of ordensFiltradas(); track os.id) {
                     <tr class="transition hover:bg-white/5">
                       <td class="whitespace-nowrap px-6 py-4 font-semibold text-sky-300">#{{ os.id }}</td>
                       <td class="px-6 py-4">{{ getVeiculo(os.veiculoId)?.placa }}</td>
@@ -63,10 +79,16 @@ import { DataService } from '../core/services/data.service';
                         </button>
                       </td>
                     </tr>
+                    }
+                  } @else {
+                    <tr>
+                      <td colspan="5" class="px-6 py-6 text-center text-sm text-slate-300">Nenhuma ordem encontrada para o filtro aplicado.</td>
+                    </tr>
                   }
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         }
 
@@ -173,6 +195,22 @@ import { DataService } from '../core/services/data.service';
                 <h3 class="text-lg font-semibold text-white">Resumo da ordem #{{ ordemSelecionada()?.id }}</h3>
                 <p class="text-sm text-slate-300/80">Veja o panorama completo de serviços, peças e anotações.</p>
               </div>
+              <div class="flex flex-wrap gap-2">
+                <a
+                  class="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-100 transition hover:bg-white/10"
+                  [routerLink]="['/ordens-servico', ordemSelecionada()?.id]"
+                >
+                  Versão para impressão
+                </a>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  [disabled]="excluindo()"
+                  (click)="excluirOrdemSelecionada()"
+                >
+                  {{ excluindo() ? 'Excluindo...' : 'Excluir ordem' }}
+                </button>
+              </div>
             </div>
 
             <div class="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-200 md:grid-cols-2">
@@ -252,6 +290,8 @@ export class OrdensServicoComponent {
 
   modoVisualizacao = signal<'lista' | 'formulario' | 'resumo'>('lista');
   ordemSelecionadaId = signal<number | null>(null);
+  termoBusca = signal('');
+  excluindo = signal(false);
 
   formularioOrdem = {
     clienteId: undefined as number | undefined,
@@ -269,7 +309,35 @@ export class OrdensServicoComponent {
     return this.dataService.getOrdemServicoById(id);
   });
 
+  ordensFiltradas = computed(() => {
+    const termo = this.termoBusca().trim().toLowerCase();
+    const ordens = this.ordensServico();
+    if (!termo) {
+      return ordens;
+    }
+
+    const veiculos = this.veiculos();
+    const clientes = this.clientes();
+
+    return ordens.filter(ordem => {
+      const veiculo = veiculos.find(v => v.id === ordem.veiculoId);
+      const cliente = clientes.find(c => c.id === ordem.clienteId);
+      const campos = [
+        String(ordem.id),
+        ordem.status,
+        veiculo?.placa,
+        veiculo?.marca,
+        veiculo?.modelo,
+        cliente?.nome
+      ]
+        .filter(Boolean)
+        .map(valor => valor!.toLowerCase());
+      return campos.some(valor => valor.includes(termo));
+    });
+  });
+
   abrirFormulario() {
+    this.termoBusca.set('');
     this.limparFormulario();
     this.modoVisualizacao.set('formulario');
   }
@@ -282,6 +350,7 @@ export class OrdensServicoComponent {
   voltarParaLista() {
     this.modoVisualizacao.set('lista');
     this.ordemSelecionadaId.set(null);
+    this.excluindo.set(false);
   }
 
   async salvarOrdem() {
@@ -328,6 +397,28 @@ export class OrdensServicoComponent {
 
   getPeca(id: number) {
     return this.pecas().find(p => p.id === id);
+  }
+
+  async excluirOrdemSelecionada() {
+    const id = this.ordemSelecionadaId();
+    if (id == null) {
+      return;
+    }
+
+    const confirmar = window.confirm('Tem certeza de que deseja excluir esta ordem de serviço?');
+    if (!confirmar) {
+      return;
+    }
+
+    this.excluindo.set(true);
+    try {
+      await this.dataService.excluirOrdemServico(id);
+      this.voltarParaLista();
+    } catch (error) {
+      console.error('Erro ao excluir ordem de serviço', error);
+    } finally {
+      this.excluindo.set(false);
+    }
   }
 
   private limparFormulario() {
