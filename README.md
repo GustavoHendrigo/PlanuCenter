@@ -4,9 +4,11 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
-This project now possui um backend Node.js simples responsável por persistir os dados em `server/database.json`. Para desenvolver:
+This project conta com um backend Node.js que agora utiliza **PostgreSQL** para persistir os dados da oficina. Para desenvolver:
 
-1. Em um terminal, inicie a API local:
+1. Garanta que um servidor PostgreSQL esteja disponível. Por padrão o backend procura pelas variáveis de ambiente `DATABASE_URL` ou `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD`. Você pode utilizar o arquivo `server/schema.sql` para criar as tabelas e dados iniciais manualmente, caso prefira preparar o banco sem executar o servidor Node.
+
+2. Em um terminal, inicie a API local:
 
    ```bash
    npm run server
@@ -14,7 +16,9 @@ This project now possui um backend Node.js simples responsável por persistir os
 
    O serviço estará disponível em `http://localhost:3000/api`.
 
-2. Em outro terminal, suba a aplicação Angular:
+   > **Dependências do backend**: instale as dependências com `npm install` (é necessário acesso ao pacote `pg` para conectar-se ao PostgreSQL). Caso precise provisionar manualmente, utilize o arquivo `package.json` como referência das versões utilizadas.
+
+3. Em outro terminal, suba a aplicação Angular:
 
    ```bash
    ng serve
